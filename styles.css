@@ -358,6 +358,19 @@ input {
   overflow-y: auto;
 }
 
+.case-dialog-actions {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.case-dialog-actions input {
+  width: 72px;
+  text-align: center;
+}
+
 .preview-group {
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 10px;

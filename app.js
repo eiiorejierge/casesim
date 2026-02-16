@@ -1,4 +1,5 @@
 ﻿const STORAGE_KEY = "vaultspin-elite-save-v2";
+const CASE_SELL_RATE = 0.65;
 
 const odds = [
   { tier: "blue", label: "Mil-Spec", chance: 79.92, color: "var(--blue)" },
@@ -399,10 +400,18 @@ const els = {
   historyList: document.getElementById("historyList"),
   sellBlueBtn: document.getElementById("sellBlueBtn"),
   sellAllBtn: document.getElementById("sellAllBtn"),
-  previewDialog: document.getElementById("previewDialog"),
-  previewTitle: document.getElementById("previewTitle"),
-  previewContent: document.getElementById("previewContent"),
-  closePreview: document.getElementById("closePreview"),
+  caseDialog: document.getElementById("caseDialog"),
+  caseDialogTitle: document.getElementById("caseDialogTitle"),
+  caseDialogMeta: document.getElementById("caseDialogMeta"),
+  caseOwnedInfo: document.getElementById("caseOwnedInfo"),
+  caseQtyInput: document.getElementById("caseQtyInput"),
+  caseBuyBtn: document.getElementById("caseBuyBtn"),
+  caseOpenBtn: document.getElementById("caseOpenBtn"),
+  caseOpenMaxBtn: document.getElementById("caseOpenMaxBtn"),
+  caseSellBtn: document.getElementById("caseSellBtn"),
+  caseSellAllBtn: document.getElementById("caseSellAllBtn"),
+  caseDialogItems: document.getElementById("caseDialogItems"),
+  closeCaseDialog: document.getElementById("closeCaseDialog"),
   openingOverlay: document.getElementById("openingOverlay"),
   overlayCaseName: document.getElementById("overlayCaseName"),
   skipSpinBtn: document.getElementById("skipSpinBtn"),
@@ -443,6 +452,7 @@ function freshState() {
     history: [],
     stats: defaultStats(),
     opening: false,
+    detailCaseId: null,
     autoQueue: 0,
     autoStopped: false,
     spinSkippers: [],
@@ -718,11 +728,13 @@ function renderCases() {
       buyCase(itemCase.id);
     });
 
-    card.querySelector(".preview-btn").addEventListener("click", () => {
+    const detailBtn = card.querySelector(".preview-btn");
+    detailBtn.textContent = "Details";
+    detailBtn.addEventListener("click", () => {
       state.selectedCaseId = itemCase.id;
       renderCases();
       renderActiveCase();
-      openPreview(itemCase);
+      openCaseDetail(itemCase.id);
     });
 
     card.addEventListener("click", (event) => {
@@ -730,6 +742,7 @@ function renderCases() {
       state.selectedCaseId = itemCase.id;
       renderCases();
       renderActiveCase();
+      openCaseDetail(itemCase.id);
     });
 
     els.caseGrid.appendChild(card);
@@ -881,6 +894,7 @@ function updateAll() {
   renderHistory();
   renderStats();
   renderView();
+  renderCaseDetail();
 }
 
 function sellItem(index) {
@@ -923,10 +937,18 @@ function sellByTier(tier) {
   setResult(`Sold items for ${money(sold)}.`, label, tier || "gold", makeItemImage(label, tier || "gold", "VaultSpin"));
 }
 
-function openPreview(itemCase) {
-  els.previewTitle.textContent = `${itemCase.name} Preview`;
-  els.previewContent.innerHTML = "";
+function renderCaseDetail() {
+  if (!state.detailCaseId) return;
+  const itemCase = getCaseById(state.detailCaseId);
+  const owned = ownedCaseCount(itemCase.id);
+  const qty = clamp(Number(els.caseQtyInput.value) || 1, 1, 5);
+  els.caseQtyInput.value = String(qty);
 
+  els.caseDialogTitle.textContent = itemCase.name;
+  els.caseDialogMeta.textContent = `${itemCase.description} | Buy: ${money(itemCase.price)} | Sell: ${money(itemCase.price * CASE_SELL_RATE)}`;
+  els.caseOwnedInfo.textContent = `Owned Cases: ${owned}`;
+
+  els.caseDialogItems.innerHTML = "";
   odds.forEach((entry) => {
     const group = document.createElement("article");
     group.className = "preview-group";
@@ -952,10 +974,40 @@ function openPreview(itemCase) {
       group.appendChild(row);
     });
 
-    els.previewContent.appendChild(group);
+    els.caseDialogItems.appendChild(group);
   });
+}
 
-  els.previewDialog.showModal();
+function openCaseDetail(caseId) {
+  state.detailCaseId = getCaseById(caseId).id;
+  renderCaseDetail();
+  els.caseDialog.showModal();
+}
+
+function sellOwnedCases(caseId, qty) {
+  const itemCase = getCaseById(caseId);
+  const owned = ownedCaseCount(itemCase.id);
+  const quantity = clamp(Math.floor(Number(qty) || 1), 1, 5);
+  const toSell = Math.min(quantity, owned);
+
+  if (toSell <= 0) {
+    setResult("No owned cases to sell.", "Sell Failed", "red", makeItemImage("No Case", "red", itemCase.name));
+    return false;
+  }
+
+  const total = Number((itemCase.price * CASE_SELL_RATE * toSell).toFixed(2));
+  state.ownedCases[itemCase.id] = owned - toSell;
+  state.balance += total;
+
+  refreshWallet();
+  renderCaseInventory();
+  renderActiveCase();
+  saveState();
+  renderCaseDetail();
+  renderCaseDetail();
+
+  setResult(`Sold ${toSell}x ${itemCase.name} for ${money(total)}.`, "Cases Sold", "gold", makeItemImage(itemCase.name, "gold", "Sold"));
+  return true;
 }
 
 function buyCase(caseId = state.selectedCaseId, qty = 1) {
@@ -1212,6 +1264,43 @@ function wireEvents() {
     saveState();
   });
 
+  els.caseBuyBtn.addEventListener("click", () => {
+    if (!state.detailCaseId) return;
+    const qty = clamp(Number(els.caseQtyInput.value) || 1, 1, 5);
+    buyCase(state.detailCaseId, qty);
+  });
+
+  els.caseOpenBtn.addEventListener("click", async () => {
+    if (!state.detailCaseId) return;
+    const qty = clamp(Number(els.caseQtyInput.value) || 1, 1, 5);
+    await openMultipleCases(state.detailCaseId, qty);
+    renderCaseDetail();
+  });
+
+  els.caseOpenMaxBtn.addEventListener("click", async () => {
+    if (!state.detailCaseId) return;
+    await openMultipleCases(state.detailCaseId, 5);
+    renderCaseDetail();
+  });
+
+  els.caseSellBtn.addEventListener("click", () => {
+    if (!state.detailCaseId) return;
+    const qty = clamp(Number(els.caseQtyInput.value) || 1, 1, 5);
+    sellOwnedCases(state.detailCaseId, qty);
+  });
+
+  els.caseSellAllBtn.addEventListener("click", () => {
+    if (!state.detailCaseId) return;
+    const owned = ownedCaseCount(state.detailCaseId);
+    if (owned <= 0) return;
+    let remaining = owned;
+    while (remaining > 0) {
+      const chunk = Math.min(5, remaining);
+      sellOwnedCases(state.detailCaseId, chunk);
+      remaining -= chunk;
+    }
+  });
+
   els.depositBtn.addEventListener("click", () => {
     const amount = Number(els.depositInput.value);
     if (!Number.isFinite(amount) || amount <= 0) {
@@ -1258,7 +1347,10 @@ function wireEvents() {
 
   els.resetBtn.addEventListener("click", () => resetEverything());
 
-  els.closePreview.addEventListener("click", () => els.previewDialog.close());
+  els.closeCaseDialog.addEventListener("click", () => {
+    els.caseDialog.close();
+    state.detailCaseId = null;
+  });
 }
 
 loadState();
@@ -1267,3 +1359,9 @@ renderChips();
 renderCases();
 updateAll();
 setResult("System ready.", "Buy a case, then open it in Inventory", "blue", makeItemImage("Ready", "blue", "VaultSpin"));
+
+
+
+
+
+

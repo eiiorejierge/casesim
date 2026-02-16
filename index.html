@@ -197,12 +197,22 @@
     </article>
   </template>
 
-  <dialog id="previewDialog" class="preview-dialog">
+  <dialog id="caseDialog" class="preview-dialog">
     <div class="dialog-head">
-      <h3 id="previewTitle">Case Preview</h3>
-      <button class="btn btn-danger" id="closePreview">Close</button>
+      <h3 id="caseDialogTitle">Case Details</h3>
+      <button class="btn btn-danger" id="closeCaseDialog">Close</button>
     </div>
-    <div id="previewContent" class="preview-content"></div>
+    <p class="muted" id="caseDialogMeta"></p>
+    <p class="muted" id="caseOwnedInfo"></p>
+    <div class="case-dialog-actions">
+      <input id="caseQtyInput" type="number" min="1" max="5" step="1" value="1" />
+      <button class="btn btn-gold" id="caseBuyBtn">Buy Qty</button>
+      <button class="btn btn-open" id="caseOpenBtn">Open Qty</button>
+      <button class="btn" id="caseOpenMaxBtn">Open 5 Now</button>
+      <button class="btn" id="caseSellBtn">Sell Qty</button>
+      <button class="btn btn-danger" id="caseSellAllBtn">Sell All Cases</button>
+    </div>
+    <div id="caseDialogItems" class="preview-content"></div>
   </dialog>
 
   <script src="app.js"></script>
