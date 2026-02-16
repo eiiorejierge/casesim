@@ -1,12 +1,12 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>VaultSpin Elite - Case Simulator</title>
+  <title>VaultSpin Elite - Luxury Case Simulator</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,500;6..96,700;6..96,900&family=Urbanist:wght@400;500;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,500;6..96,700;6..96,900&family=Urbanist:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -16,7 +16,7 @@
   <main class="layout">
     <header class="panel header-panel">
       <div>
-        <p class="eyebrow">Fake Economy | Skill & Luck</p>
+        <p class="eyebrow">Luxury Gaming | Fortune Awaits</p>
         <h1>VaultSpin Elite</h1>
       </div>
       <div class="wallet-grid">
@@ -37,19 +37,19 @@
 
     <section class="panel tabs-panel">
       <div class="view-tabs" id="viewTabs">
-        <button class="tab-btn active" data-view="market">Case Room</button>
+        <button class="tab-btn active" data-view="market">Case Market</button>
         <button class="tab-btn" data-view="inventory">Inventory</button>
         <button class="tab-btn" data-view="history">History</button>
       </div>
       <div class="title-row">
-        <p class="muted">Buy cases in Case Room, then open them from Inventory.</p>
-        <button class="btn btn-danger" id="resetBtn">Reset Everything</button>
+        <p class="muted">Acquire premium cases in the market, then unveil your fortune in inventory.</p>
+        <button class="btn btn-danger" id="resetBtn">Reset Progress</button>
       </div>
     </section>
 
     <section class="panel controls-panel" data-view-target="market">
       <div class="deposit-wrap">
-        <h2>Deposit Fake Cash</h2>
+        <h2>Deposit Funds</h2>
         <div class="deposit-controls">
           <input id="depositInput" type="number" min="1" step="1" placeholder="Enter amount" />
           <button class="btn btn-gold" id="depositBtn">Deposit</button>
@@ -57,19 +57,19 @@
         <div class="chips" id="chips"></div>
       </div>
       <div class="automation-wrap">
-        <h2>Auto Open</h2>
+        <h2>Auto-Open Queue</h2>
         <div class="auto-row">
           <input id="autoCount" type="number" min="1" max="25" step="1" value="5" />
-          <button class="btn" id="autoBtn">Open Queue</button>
+          <button class="btn" id="autoBtn">Start Queue</button>
           <button class="btn btn-danger" id="stopAutoBtn">Stop</button>
         </div>
-        <p class="muted" id="autoStatus">No queue active.</p>
+        <p class="muted" id="autoStatus">No active queue.</p>
       </div>
     </section>
 
     <section class="panel cases-panel" data-view-target="market">
       <div class="title-row">
-        <h2>Case Market</h2>
+        <h2>Premium Case Collection</h2>
         <p class="muted">Blue 79.92% | Purple 15.98% | Pink 3.2% | Red 0.64% | Gold 0.26%</p>
       </div>
       <div class="case-grid" id="caseGrid"></div>
@@ -77,13 +77,13 @@
 
     <section class="panel last-drop-panel" data-view-target="market">
       <div class="title-row">
-        <h2>Last Opening</h2>
-        <p class="muted" id="activeCaseLabel">Pick a case to begin.</p>
+        <h2>Latest Reveal</h2>
+        <p class="muted" id="activeCaseLabel">Select a case to begin your journey.</p>
       </div>
       <div class="last-drop-card">
-        <img id="resultImage" class="item-thumb" alt="Drop image" />
+        <img id="resultImage" class="item-thumb" alt="Drop reveal" />
         <div>
-          <p id="resultText">Your next drop appears here.</p>
+          <p id="resultText">Your next revelation appears here.</p>
           <h3 id="resultItem">---</h3>
         </div>
       </div>
@@ -99,22 +99,22 @@
 
     <section class="panel inventory-panel" data-view-target="inventory">
       <div class="title-row">
-        <h2>Inventory</h2>
+        <h2>Your Collection</h2>
         <div class="inventory-actions">
-          <button class="btn" id="sellBlueBtn">Sell Blues</button>
-          <button class="btn" id="sellAllBtn">Sell All</button>
+          <button class="btn" id="sellBlueBtn">Liquidate Blues</button>
+          <button class="btn" id="sellAllBtn">Liquidate All</button>
         </div>
       </div>
-      <h3>Owned Cases</h3>
+      <h3>Unopened Cases</h3>
       <div class="case-inventory-list" id="caseInventoryList"></div>
-      <h3>Opened Item Inventory</h3>
+      <h3>Acquired Items</h3>
       <div class="inventory-list" id="inventoryList"></div>
     </section>
 
     <section class="panel history-panel" data-view-target="history">
       <div class="title-row">
-        <h2>Drop History</h2>
-        <p class="muted">Latest openings first.</p>
+        <h2>Opening History</h2>
+        <p class="muted">Your recent revelations.</p>
       </div>
       <div class="history-list" id="historyList"></div>
     </section>
@@ -125,8 +125,8 @@
       <div class="opening-head">
         <p class="muted" id="overlayCaseName">Opening...</p>
         <div class="overlay-buttons">
-          <button class="btn btn-danger" id="skipSpinBtn">Skip</button>
-          <button class="btn hidden-action" id="closeOverlayBtn">Close</button>
+          <button class="btn btn-danger" id="skipSpinBtn">Skip Animation</button>
+          <button class="btn hidden-action" id="closeOverlayBtn">Continue</button>
         </div>
       </div>
       <div id="singleOpenView">
@@ -137,8 +137,8 @@
           </div>
         </div>
         <div class="overlay-result">
-          <img id="overlayResultImage" class="item-thumb overlay-thumb" alt="Result image" />
-          <p id="overlayResultText">Rolling...</p>
+          <img id="overlayResultImage" class="item-thumb overlay-thumb" alt="Revealed item" />
+          <p id="overlayResultText">Revealing...</p>
           <h2 id="overlayResultItem">---</h2>
         </div>
       </div>
@@ -157,8 +157,8 @@
       </div>
       <p class="case-price"></p>
       <div class="case-actions">
-        <button class="btn btn-open">Open</button>
-        <button class="btn btn-alt preview-btn">Preview</button>
+        <button class="btn btn-open">Acquire</button>
+        <button class="btn btn-alt preview-btn">Details</button>
       </div>
     </article>
   </template>
@@ -170,7 +170,7 @@
         <p class="inventory-name"></p>
         <p class="inventory-meta"></p>
       </div>
-      <button class="btn btn-gold sell-btn">Sell</button>
+      <button class="btn btn-gold sell-btn">Liquidate</button>
     </article>
   </template>
 
@@ -182,7 +182,7 @@
       </div>
       <div class="case-open-controls">
         <input class="multi-open-input" type="number" min="1" max="10" step="1" value="1" />
-        <button class="btn btn-open open-owned-btn">Open</button>
+        <button class="btn btn-open open-owned-btn">Unveil</button>
       </div>
     </article>
   </template>
@@ -206,11 +206,11 @@
     <p class="muted" id="caseOwnedInfo"></p>
     <div class="case-dialog-actions">
       <input id="caseQtyInput" type="number" min="1" max="10" step="1" value="1" />
-      <button class="btn btn-gold" id="caseBuyBtn">Buy Qty</button>
-      <button class="btn btn-open" id="caseOpenBtn">Open Qty</button>
-      <button class="btn" id="caseOpenMaxBtn">Open 10 Now</button>
-      <button class="btn" id="caseSellBtn">Sell Qty</button>
-      <button class="btn btn-danger" id="caseSellAllBtn">Sell All Cases</button>
+      <button class="btn btn-gold" id="caseBuyBtn">Acquire Qty</button>
+      <button class="btn btn-open" id="caseOpenBtn">Unveil Qty</button>
+      <button class="btn" id="caseOpenMaxBtn">Unveil 10 Now</button>
+      <button class="btn" id="caseSellBtn">Liquidate Qty</button>
+      <button class="btn btn-danger" id="caseSellAllBtn">Liquidate All</button>
     </div>
     <div id="caseDialogItems" class="preview-content"></div>
   </dialog>
