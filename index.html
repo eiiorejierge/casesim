@@ -42,7 +42,7 @@
         <button class="tab-btn" data-view="history">History</button>
       </div>
       <div class="title-row">
-        <p class="muted">Open cases in Case Room. Manage your items in Inventory.</p>
+        <p class="muted">Buy cases in Case Room, then open them from Inventory.</p>
         <button class="btn btn-danger" id="resetBtn">Reset Everything</button>
       </div>
     </section>
@@ -105,6 +105,9 @@
           <button class="btn" id="sellAllBtn">Sell All</button>
         </div>
       </div>
+      <h3>Owned Cases</h3>
+      <div class="case-inventory-list" id="caseInventoryList"></div>
+      <h3>Opened Item Inventory</h3>
       <div class="inventory-list" id="inventoryList"></div>
     </section>
 
@@ -159,6 +162,16 @@
         <p class="inventory-meta"></p>
       </div>
       <button class="btn btn-gold sell-btn">Sell</button>
+    </article>
+  </template>
+
+  <template id="caseInventoryTemplate">
+    <article class="case-inventory-item">
+      <div>
+        <p class="case-inv-name"></p>
+        <p class="case-inv-meta"></p>
+      </div>
+      <button class="btn btn-open open-owned-btn">Open</button>
     </article>
   </template>
 

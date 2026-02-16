@@ -394,6 +394,7 @@ const els = {
   resultImage: document.getElementById("resultImage"),
   statsLine: document.getElementById("statsLine"),
   rarityBars: document.getElementById("rarityBars"),
+  caseInventoryList: document.getElementById("caseInventoryList"),
   inventoryList: document.getElementById("inventoryList"),
   historyList: document.getElementById("historyList"),
   sellBlueBtn: document.getElementById("sellBlueBtn"),
@@ -412,6 +413,7 @@ const els = {
   viewTabs: document.getElementById("viewTabs"),
   viewPanels: document.querySelectorAll("[data-view-target]"),
   caseTemplate: document.getElementById("caseTemplate"),
+  caseInventoryTemplate: document.getElementById("caseInventoryTemplate"),
   inventoryTemplate: document.getElementById("inventoryTemplate"),
   historyTemplate: document.getElementById("historyTemplate"),
 };
@@ -432,6 +434,7 @@ function freshState() {
     balance: 0,
     selectedCaseId: cases[0].id,
     currentView: "market",
+    ownedCases: {},
     inventory: [],
     history: [],
     stats: defaultStats(),
@@ -453,6 +456,10 @@ function getCaseById(id) {
   return cases.find((itemCase) => itemCase.id === id) || cases[0];
 }
 
+function ownedCaseCount(caseId) {
+  return Math.max(0, Math.floor(Number(state.ownedCases[caseId]) || 0));
+}
+
 function hydrateEntry(entry) {
   const fallbackTier = entry.tier || "blue";
   const fallbackCase = entry.caseName || entry.source || "VaultSpin";
@@ -472,6 +479,7 @@ function saveState() {
       balance: state.balance,
       selectedCaseId: state.selectedCaseId,
       currentView: state.currentView,
+      ownedCases: state.ownedCases,
       inventory: state.inventory,
       history: state.history,
       stats: state.stats,
@@ -490,6 +498,14 @@ function loadState() {
     state.balance = Number(data.balance) || 0;
     state.selectedCaseId = getCaseById(data.selectedCaseId).id;
     state.currentView = ["market", "inventory", "history"].includes(data.currentView) ? data.currentView : "market";
+    state.ownedCases = {};
+    if (data.ownedCases && typeof data.ownedCases === "object") {
+      Object.keys(data.ownedCases).forEach((caseId) => {
+        const itemCase = getCaseById(caseId);
+        const count = Math.max(0, Math.floor(Number(data.ownedCases[caseId]) || 0));
+        if (itemCase && count > 0) state.ownedCases[itemCase.id] = count;
+      });
+    }
     state.inventory = Array.isArray(data.inventory) ? data.inventory.map(hydrateEntry) : [];
     state.history = Array.isArray(data.history) ? data.history.map(hydrateEntry) : [];
     state.stats = {
@@ -667,11 +683,13 @@ function renderCases() {
 
     if (itemCase.id === state.selectedCaseId) card.classList.add("selected");
 
-    card.querySelector(".btn-open").addEventListener("click", () => {
+    const buyBtn = card.querySelector(".btn-open");
+    buyBtn.textContent = "Buy";
+    buyBtn.addEventListener("click", () => {
       state.selectedCaseId = itemCase.id;
       renderCases();
       renderActiveCase();
-      openCase();
+      buyCase(itemCase.id);
     });
 
     card.querySelector(".preview-btn").addEventListener("click", () => {
@@ -694,7 +712,35 @@ function renderCases() {
 
 function renderActiveCase() {
   const itemCase = getCaseById(state.selectedCaseId);
-  els.activeCaseLabel.textContent = `${itemCase.name} selected | Price: ${money(itemCase.price)}`;
+  els.activeCaseLabel.textContent = `${itemCase.name} selected | Price: ${money(itemCase.price)} | Owned: ${ownedCaseCount(itemCase.id)}`;
+}
+
+function renderCaseInventory() {
+  els.caseInventoryList.innerHTML = "";
+  const owned = cases
+    .map((itemCase) => ({ itemCase, count: ownedCaseCount(itemCase.id) }))
+    .filter((entry) => entry.count > 0);
+
+  if (owned.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "muted";
+    empty.textContent = "No unopened cases. Buy cases in Case Room first.";
+    els.caseInventoryList.appendChild(empty);
+    return;
+  }
+
+  owned.forEach(({ itemCase, count }) => {
+    const row = els.caseInventoryTemplate.content.firstElementChild.cloneNode(true);
+    row.querySelector(".case-inv-name").textContent = itemCase.name;
+    row.querySelector(".case-inv-meta").textContent = `Owned: ${count} | Buy Price: ${money(itemCase.price)}`;
+    row.querySelector(".open-owned-btn").addEventListener("click", () => {
+      state.selectedCaseId = itemCase.id;
+      renderCases();
+      renderActiveCase();
+      openCase(itemCase.id);
+    });
+    els.caseInventoryList.appendChild(row);
+  });
 }
 
 function renderInventory() {
@@ -801,6 +847,7 @@ function updateAll() {
   refreshWallet();
   renderCases();
   renderActiveCase();
+  renderCaseInventory();
   renderInventory();
   renderHistory();
   renderStats();
@@ -882,19 +929,49 @@ function openPreview(itemCase) {
   els.previewDialog.showModal();
 }
 
-async function openCase() {
+function buyCase(caseId = state.selectedCaseId, qty = 1) {
+  const itemCase = getCaseById(caseId);
+  const quantity = Math.max(1, Math.floor(Number(qty) || 1));
+  const totalCost = itemCase.price * quantity;
+
+  if (state.balance < totalCost) {
+    setResult("Not enough fake funds to buy this case.", "Purchase Failed", "red", makeItemImage("Denied", "red", "VaultSpin"));
+    return false;
+  }
+
+  state.balance -= totalCost;
+  state.stats.spent += totalCost;
+  state.ownedCases[itemCase.id] = ownedCaseCount(itemCase.id) + quantity;
+  state.currentView = "inventory";
+  refreshWallet();
+  renderCaseInventory();
+  renderActiveCase();
+  renderView();
+  saveState();
+
+  setResult(
+    `Bought ${quantity}x ${itemCase.name} for ${money(totalCost)}.`,
+    `${itemCase.name} added to inventory`,
+    "gold",
+    makeItemImage(itemCase.name, "gold", "Bought")
+  );
+  return true;
+}
+
+async function openCase(caseId = state.selectedCaseId) {
   if (state.opening) return false;
 
-  const itemCase = getCaseById(state.selectedCaseId);
-  if (state.balance < itemCase.price) {
-    setResult("Not enough fake funds.", "Insufficient Balance", "red", makeItemImage("Denied", "red", "VaultSpin"));
+  const itemCase = getCaseById(caseId);
+  if (ownedCaseCount(itemCase.id) <= 0) {
+    setResult("You do not own this case yet. Buy it first.", "No Case Owned", "red", makeItemImage("No Case", "red", itemCase.name));
     return false;
   }
 
   state.opening = true;
-  state.balance -= itemCase.price;
-  state.stats.spent += itemCase.price;
-  refreshWallet();
+  state.ownedCases[itemCase.id] = ownedCaseCount(itemCase.id) - 1;
+  renderCaseInventory();
+  renderActiveCase();
+  saveState();
 
   const winner = rollItem(itemCase);
   const spin = makeReelSpin(itemCase, winner);
@@ -944,13 +1021,20 @@ async function openCase() {
 async function runAutoOpen() {
   if (state.autoQueue > 0 || state.opening) return;
 
+  const selected = getCaseById(state.selectedCaseId);
+  if (ownedCaseCount(selected.id) <= 0) {
+    els.autoStatus.textContent = "No owned cases for selected case. Buy first.";
+    return;
+  }
+
   const desired = clamp(Number(els.autoCount.value) || 1, 1, 25);
   state.autoQueue = desired;
   state.autoStopped = false;
 
   while (state.autoQueue > 0 && !state.autoStopped) {
+    if (ownedCaseCount(selected.id) <= 0) break;
     els.autoStatus.textContent = `Queue running: ${state.autoQueue} remaining`;
-    const opened = await openCase();
+    const opened = await openCase(selected.id);
     if (!opened) break;
     state.autoQueue -= 1;
     await new Promise((resolve) => window.setTimeout(resolve, 130));
@@ -969,7 +1053,7 @@ async function runAutoOpen() {
 }
 
 function resetEverything() {
-  const ok = window.confirm("Reset everything? This clears balance, inventory, history, and all stats.");
+  const ok = window.confirm("Reset everything? This clears balance, owned cases, opened items, history, and all stats.");
   if (!ok) return;
 
   const selectedCaseId = state.selectedCaseId;
@@ -1033,4 +1117,4 @@ loadState();
 wireEvents();
 renderChips();
 updateAll();
-setResult("System ready.", "Select a case and open", "blue", makeItemImage("Ready", "blue", "VaultSpin"));
+setResult("System ready.", "Buy a case, then open it in Inventory", "blue", makeItemImage("Ready", "blue", "VaultSpin"));

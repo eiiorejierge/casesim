@@ -75,6 +75,7 @@ body.overlay-open {
 h1, h2, h3, strong { font-family: "Bodoni Moda", serif; margin: 0; }
 h1 { font-size: clamp(1.6rem, 3vw, 2.2rem); letter-spacing: 0.04em; }
 h2 { font-size: clamp(1rem, 2vw, 1.35rem); }
+h3 { font-size: 1rem; margin: 0.6rem 0 0.5rem; }
 
 .eyebrow,
 .muted,
@@ -282,6 +283,33 @@ input {
   max-height: 420px;
   overflow-y: auto;
   padding-right: 0.2rem;
+}
+
+.case-inventory-list {
+  display: grid;
+  gap: 0.55rem;
+  margin-bottom: 0.7rem;
+}
+
+.case-inventory-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--panel-strong);
+  border-radius: 11px;
+  padding: 0.7rem;
+}
+
+.case-inv-name {
+  margin: 0;
+  font-weight: 800;
+}
+
+.case-inv-meta {
+  margin: 0;
+  color: var(--muted);
 }
 
 .inventory-item,
