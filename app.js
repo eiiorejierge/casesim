@@ -1,4 +1,4 @@
-﻿const STORAGE_KEY = "vaultspin-elite-save-v2";
+const STORAGE_KEY = "vaultspin-elite-save-v2";
 const CASE_SELL_RATE = 0.65;
 
 const odds = [
@@ -570,7 +570,7 @@ function renderChips() {
       state.balance += amount;
       refreshWallet();
       saveState();
-      setResult(`Deposited ${money(amount)} fake cash.`, "Funded", "gold", makeItemImage("Funded", "gold", "VaultSpin"));
+      setResult(`Deposited ${money(amount)} into your account.`, "Funds Added", "gold", makeItemImage("Funded", "gold", "VaultSpin"));
     });
     els.chips.appendChild(chip);
   });
@@ -644,7 +644,7 @@ function runSpinAnimation(reelTrackEl, targetIndex) {
   return new Promise((resolve) => {
     const reelWindow = reelTrackEl.parentElement;
     const firstSlot = reelTrackEl.firstElementChild;
-    const slotWidth = firstSlot ? firstSlot.getBoundingClientRect().width : 170;
+    const slotWidth = firstSlot ? firstSlot.getBoundingClientRect().width : 180;
     const stopAt = targetIndex * slotWidth - (reelWindow.clientWidth / 2 - slotWidth / 2);
     let finished = false;
     let skipper = null;
@@ -673,18 +673,18 @@ function runSpinAnimation(reelTrackEl, targetIndex) {
     reelTrackEl.style.transform = "translateX(0px)";
 
     requestAnimationFrame(() => {
-      reelTrackEl.style.transition = "transform 2.45s cubic-bezier(0.1, 0.72, 0.12, 1)";
+      reelTrackEl.style.transition = "transform 2.65s cubic-bezier(0.15, 0.75, 0.15, 1)";
       reelTrackEl.style.transform = `translateX(-${stopAt}px)`;
     });
 
-    window.setTimeout(finish, 2600);
+    window.setTimeout(finish, 2800);
   });
 }
 
 function showOverlay(caseName, mode = "single") {
   setOverlayMode(mode);
-  els.overlayCaseName.textContent = `Opening ${caseName}`;
-  els.overlayResultText.textContent = "Rolling...";
+  els.overlayCaseName.textContent = `Unveiling ${caseName}`;
+  els.overlayResultText.textContent = "Revealing...";
   els.overlayResultItem.textContent = "---";
   els.overlayResultItem.className = "";
   els.overlayResultImage.src = makeItemImage("Rolling", "blue", caseName);
@@ -712,15 +712,15 @@ function renderCases() {
 
   cases.forEach((itemCase, index) => {
     const card = els.caseTemplate.content.firstElementChild.cloneNode(true);
-    card.style.animationDelay = `${index * 90}ms`;
+    card.style.animationDelay = `${index * 70}ms`;
     card.querySelector(".case-name").textContent = itemCase.name;
     card.querySelector(".case-desc").textContent = itemCase.description;
-    card.querySelector(".case-price").textContent = `Cost ${money(itemCase.price)}`;
+    card.querySelector(".case-price").textContent = `${money(itemCase.price)}`;
 
     if (itemCase.id === state.selectedCaseId) card.classList.add("selected");
 
     const buyBtn = card.querySelector(".btn-open");
-    buyBtn.textContent = "Buy";
+    buyBtn.textContent = "Acquire";
     buyBtn.addEventListener("click", () => {
       state.selectedCaseId = itemCase.id;
       renderCases();
@@ -763,7 +763,7 @@ function renderCaseInventory() {
   if (owned.length === 0) {
     const empty = document.createElement("p");
     empty.className = "muted";
-    empty.textContent = "No unopened cases. Buy cases in Case Room first.";
+    empty.textContent = "No unopened cases. Acquire cases in the market first.";
     els.caseInventoryList.appendChild(empty);
     return;
   }
@@ -773,7 +773,7 @@ function renderCaseInventory() {
     const multiInput = row.querySelector(".multi-open-input");
     const openButton = row.querySelector(".open-owned-btn");
     row.querySelector(".case-inv-name").textContent = itemCase.name;
-    row.querySelector(".case-inv-meta").textContent = `Owned: ${count} | Buy Price: ${money(itemCase.price)}`;
+    row.querySelector(".case-inv-meta").textContent = `Owned: ${count} | Value: ${money(itemCase.price)}`;
     multiInput.max = String(Math.min(10, count));
     openButton.addEventListener("click", () => {
       const desired = clamp(Number(multiInput.value) || 1, 1, 10);
@@ -909,7 +909,7 @@ function sellItem(index) {
   renderInventory();
   renderStats();
   saveState();
-  setResult(`Sold for ${money(item.value)}.`, item.name, item.tier, item.image);
+  setResult(`Liquidated for ${money(item.value)}.`, item.name, item.tier, item.image);
 }
 
 function sellByTier(tier) {
@@ -933,8 +933,8 @@ function sellByTier(tier) {
   renderStats();
   saveState();
 
-  const label = tier ? `Sold ${tier.toUpperCase()} items` : "Sold Everything";
-  setResult(`Sold items for ${money(sold)}.`, label, tier || "gold", makeItemImage(label, tier || "gold", "VaultSpin"));
+  const label = tier ? `${tier.toUpperCase()} Items Liquidated` : "All Items Liquidated";
+  setResult(`Liquidated items for ${money(sold)}.`, label, tier || "gold", makeItemImage(label, tier || "gold", "VaultSpin"));
 }
 
 function renderCaseDetail() {
@@ -991,7 +991,7 @@ function sellOwnedCases(caseId, qty) {
   const toSell = Math.min(quantity, owned);
 
   if (toSell <= 0) {
-    setResult("No owned cases to sell.", "Sell Failed", "red", makeItemImage("No Case", "red", itemCase.name));
+    setResult("No owned cases to liquidate.", "Sale Failed", "red", makeItemImage("No Case", "red", itemCase.name));
     return false;
   }
 
@@ -1005,7 +1005,7 @@ function sellOwnedCases(caseId, qty) {
   saveState();
   renderCaseDetail();
 
-  setResult(`Sold ${toSell}x ${itemCase.name} for ${money(total)}.`, "Cases Sold", "gold", makeItemImage(itemCase.name, "gold", "Sold"));
+  setResult(`Liquidated ${toSell}x ${itemCase.name} for ${money(total)}.`, "Cases Sold", "gold", makeItemImage(itemCase.name, "gold", "Sold"));
   return true;
 }
 
@@ -1015,7 +1015,7 @@ function buyCase(caseId = state.selectedCaseId, qty = 1) {
   const totalCost = itemCase.price * quantity;
 
   if (state.balance < totalCost) {
-    setResult("Not enough fake funds to buy this case.", "Purchase Failed", "red", makeItemImage("Denied", "red", "VaultSpin"));
+    setResult("Insufficient funds to acquire this case.", "Purchase Failed", "red", makeItemImage("Denied", "red", "VaultSpin"));
     return false;
   }
 
@@ -1028,10 +1028,10 @@ function buyCase(caseId = state.selectedCaseId, qty = 1) {
   saveState();
 
   setResult(
-    `Bought ${quantity}x ${itemCase.name} for ${money(totalCost)}.`,
-    `${itemCase.name} added to inventory`,
+    `Acquired ${quantity}x ${itemCase.name} for ${money(totalCost)}.`,
+    `${itemCase.name} added to collection`,
     "gold",
-    makeItemImage(itemCase.name, "gold", "Bought")
+    makeItemImage(itemCase.name, "gold", "Acquired")
   );
   return true;
 }
@@ -1042,7 +1042,7 @@ async function openCase(caseId = state.selectedCaseId, options = {}) {
 
   const itemCase = getCaseById(caseId);
   if (ownedCaseCount(itemCase.id) <= 0) {
-    setResult("You do not own this case yet. Buy it first.", "No Case Owned", "red", makeItemImage("No Case", "red", itemCase.name));
+    setResult("You do not own this case yet. Acquire it first.", "No Case Owned", "red", makeItemImage("No Case", "red", itemCase.name));
     return false;
   }
 
@@ -1081,7 +1081,7 @@ async function openCase(caseId = state.selectedCaseId, options = {}) {
   saveState();
 
   const profitable = entry.value >= itemCase.price;
-  const message = profitable ? "Profit hit" : "Loss roll";
+  const message = profitable ? "Profitable reveal" : "Value declined";
   setResult(`${message} | ${itemCase.name}`, `${entry.name} (${money(entry.value)})`, entry.tier, entry.image);
 
   els.overlayResultText.textContent = `${message} | ${itemCase.name}`;
@@ -1091,7 +1091,7 @@ async function openCase(caseId = state.selectedCaseId, options = {}) {
   els.overlayResultImage.alt = entry.name;
 
   if (autoClose || state.autoQueue > 0) {
-    await new Promise((resolve) => window.setTimeout(resolve, 500));
+    await new Promise((resolve) => window.setTimeout(resolve, 600));
     hideOverlay();
   } else {
     await waitForOverlayClose();
@@ -1106,7 +1106,7 @@ async function runAutoOpen() {
 
   const selected = getCaseById(state.selectedCaseId);
   if (ownedCaseCount(selected.id) <= 0) {
-    els.autoStatus.textContent = "No owned cases for selected case. Buy first.";
+    els.autoStatus.textContent = "No owned cases for selected case. Acquire first.";
     return;
   }
 
@@ -1116,19 +1116,19 @@ async function runAutoOpen() {
 
   while (state.autoQueue > 0 && !state.autoStopped) {
     if (ownedCaseCount(selected.id) <= 0) break;
-    els.autoStatus.textContent = `Queue running: ${state.autoQueue} remaining`;
+    els.autoStatus.textContent = `Queue active: ${state.autoQueue} remaining`;
     const opened = await openCase(selected.id, { autoClose: true });
     if (!opened) break;
     state.autoQueue -= 1;
-    await new Promise((resolve) => window.setTimeout(resolve, 130));
+    await new Promise((resolve) => window.setTimeout(resolve, 150));
   }
 
   if (state.autoStopped) {
-    els.autoStatus.textContent = "Queue stopped.";
+    els.autoStatus.textContent = "Queue halted.";
   } else if (state.autoQueue === 0) {
     els.autoStatus.textContent = "Queue complete.";
   } else {
-    els.autoStatus.textContent = "Queue ended early (insufficient balance).";
+    els.autoStatus.textContent = "Queue ended early (insufficient cases).";
   }
 
   state.autoQueue = 0;
@@ -1168,12 +1168,13 @@ async function openMultipleCases(caseId, count) {
 
     const card = document.createElement("article");
     card.className = "multi-card";
+    card.style.animationDelay = `${i * 60}ms`;
     card.innerHTML = `
       <div class="needle"></div>
       <div class="reel-window"><div class="reel-track"></div></div>
       <div class="multi-result">
         <img class="item-thumb multi-thumb" alt="Rolling item" />
-        <p>Rolling...</p>
+        <p>Revealing...</p>
         <h4>---</h4>
       </div>
     `;
@@ -1214,7 +1215,7 @@ async function openMultipleCases(caseId, count) {
     if (!bestEntry || entry.value > bestEntry.value) bestEntry = entry;
 
     const profitable = entry.value >= targetCase.price;
-    item.resultText.textContent = profitable ? "Profit hit" : "Loss roll";
+    item.resultText.textContent = profitable ? "Profitable" : "Below value";
     item.resultTitle.className = tierClass(entry.tier);
     item.resultTitle.textContent = `${entry.name} (${money(entry.value)})`;
     item.resultImage.src = entry.image;
@@ -1226,7 +1227,7 @@ async function openMultipleCases(caseId, count) {
 
   if (bestEntry) {
     setResult(
-      `Opened ${maxPossible}x ${targetCase.name} at once.`,
+      `Unveiled ${maxPossible}x ${targetCase.name} simultaneously.`,
       `${bestEntry.name} (${money(bestEntry.value)})`,
       bestEntry.tier,
       bestEntry.image
@@ -1239,7 +1240,7 @@ async function openMultipleCases(caseId, count) {
 }
 
 function resetEverything() {
-  const ok = window.confirm("Reset everything? This clears balance, owned cases, opened items, history, and all stats.");
+  const ok = window.confirm("Reset all progress? This clears balance, cases, items, history, and statistics.");
   if (!ok) return;
 
   const selectedCaseId = state.selectedCaseId;
@@ -1251,7 +1252,7 @@ function resetEverything() {
   updateAll();
   saveState();
   setResult("All progress reset.", "Fresh Start", "gold", makeItemImage("Fresh Start", "gold", "VaultSpin"));
-  els.autoStatus.textContent = "No queue active.";
+  els.autoStatus.textContent = "No active queue.";
 }
 
 function wireEvents() {
@@ -1318,7 +1319,7 @@ function wireEvents() {
     els.depositInput.value = "";
     refreshWallet();
     saveState();
-    setResult(`Deposited ${money(amount)} fake cash.`, "Balance Updated", "gold", makeItemImage("Funded", "gold", "VaultSpin"));
+    setResult(`Deposited ${money(amount)} into your account.`, "Balance Updated", "gold", makeItemImage("Funded", "gold", "VaultSpin"));
   });
 
   els.depositInput.addEventListener("keydown", (event) => {
@@ -1364,11 +1365,4 @@ wireEvents();
 renderChips();
 renderCases();
 updateAll();
-setResult("System ready.", "Buy a case, then open it in Inventory", "blue", makeItemImage("Ready", "blue", "VaultSpin"));
-
-
-
-
-
-
-
+setResult("System ready.", "Acquire a case, then unveil it in inventory", "blue", makeItemImage("Ready", "blue", "VaultSpin"));
