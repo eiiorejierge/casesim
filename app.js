@@ -1272,15 +1272,22 @@ function wireEvents() {
 
   els.caseOpenBtn.addEventListener("click", async () => {
     if (!state.detailCaseId) return;
+    const caseId = state.detailCaseId;
     const qty = clamp(Number(els.caseQtyInput.value) || 1, 1, 5);
-    await openMultipleCases(state.detailCaseId, qty);
+    if (qty >= 5) {
+      els.caseDialog.close();
+      state.detailCaseId = null;
+    }
+    await openMultipleCases(caseId, qty);
     renderCaseDetail();
   });
 
   els.caseOpenMaxBtn.addEventListener("click", async () => {
     if (!state.detailCaseId) return;
-    await openMultipleCases(state.detailCaseId, 5);
-    renderCaseDetail();
+    const caseId = state.detailCaseId;
+    els.caseDialog.close();
+    state.detailCaseId = null;
+    await openMultipleCases(caseId, 5);
   });
 
   els.caseSellBtn.addEventListener("click", () => {
