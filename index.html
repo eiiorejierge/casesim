@@ -3,130 +3,176 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>VaultSpin Elite - Luxury Case Simulator</title>
+  <title>VaultSpin Elite - Case Simulator</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,500;6..96,700;6..96,900&family=Urbanist:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,500;6..96,700;6..96,900&family=Urbanist:wght@400;500;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <div class="bg-glow bg-glow-left"></div>
   <div class="bg-glow bg-glow-right"></div>
 
-  <main class="layout">
-    <header class="panel header-panel">
-      <div>
-        <p class="eyebrow">Luxury Gaming | Fortune Awaits</p>
-        <h1>VaultSpin Elite</h1>
+  <!-- ===== STICKY TOP BAR ===== -->
+  <header id="topBar" class="top-bar">
+    <div class="top-bar__brand">
+      <h1>VaultSpin Elite</h1>
+      <p class="eyebrow">Fake Economy</p>
+    </div>
+    <div class="top-bar__wallet">
+      <div class="wallet-stat">
+        <span class="wallet-stat__label">Balance</span>
+        <strong id="balance" class="wallet-stat__value">$0.00</strong>
       </div>
-      <div class="wallet-grid">
-        <article>
-          <p>Balance</p>
-          <strong id="balance">$0.00</strong>
-        </article>
-        <article>
-          <p>Inventory Value</p>
-          <strong id="invValue">$0.00</strong>
-        </article>
-        <article>
-          <p>Net Worth</p>
-          <strong id="netWorth">$0.00</strong>
-        </article>
+      <div class="wallet-stat">
+        <span class="wallet-stat__label">Inventory</span>
+        <strong id="invValue" class="wallet-stat__value">$0.00</strong>
       </div>
-    </header>
+      <div class="wallet-stat">
+        <span class="wallet-stat__label">Net Worth</span>
+        <strong id="netWorth" class="wallet-stat__value">$0.00</strong>
+      </div>
+      <div class="wallet-stat wallet-stat--pnl">
+        <span class="wallet-stat__label">P&L</span>
+        <strong id="sessionPnl" class="wallet-stat__value wallet-stat__value--neutral">$0.00</strong>
+      </div>
+    </div>
+    <div class="top-bar__deposit">
+      <input id="depositInput" type="number" min="1" step="1" placeholder="$ Amount" />
+      <button class="btn btn-gold btn--sm" id="depositBtn">Deposit</button>
+      <div class="chips" id="chips"></div>
+    </div>
+  </header>
 
-    <section class="panel tabs-panel">
-      <div class="view-tabs" id="viewTabs">
-        <button class="tab-btn active" data-view="market">Case Market</button>
-        <button class="tab-btn" data-view="inventory">Inventory</button>
-        <button class="tab-btn" data-view="history">History</button>
-      </div>
-      <div class="title-row">
-        <p class="muted">Acquire premium cases in the market, then unveil your fortune in inventory.</p>
-        <button class="btn btn-danger" id="resetBtn">Reset Progress</button>
-      </div>
-    </section>
+  <!-- ===== APP SHELL ===== -->
+  <div class="app-shell">
+    <!-- Sidebar (desktop) -->
+    <nav id="sidebar" class="sidebar">
+      <button class="sidebar__item sidebar__item--active" data-section="caseRoom" title="Cases">
+        <svg class="sidebar__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/><line x1="12" y1="11" x2="12" y2="15"/><line x1="10" y1="13" x2="14" y2="13"/></svg>
+        <span class="sidebar__label">Cases</span>
+      </button>
+      <button class="sidebar__item" data-section="inventory" title="Inventory">
+        <svg class="sidebar__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+        <span class="sidebar__label">Inventory</span>
+        <span class="sidebar__badge hidden" id="invCountBadge">0</span>
+      </button>
+      <button class="sidebar__item" data-section="history" title="History">
+        <svg class="sidebar__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span class="sidebar__label">History</span>
+      </button>
+      <button class="sidebar__item" data-section="stats" title="Analytics">
+        <svg class="sidebar__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        <span class="sidebar__label">Stats</span>
+      </button>
+      <div class="sidebar__spacer"></div>
+      <label class="sidebar__toggle" title="Instant results, no animation">
+        <input type="checkbox" id="fastModeToggle" />
+        <svg class="sidebar__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        <span class="sidebar__label">Fast</span>
+      </label>
+      <button class="sidebar__item sidebar__item--danger" id="resetBtn" title="Reset Everything">
+        <svg class="sidebar__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14H7L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+        <span class="sidebar__label">Reset</span>
+      </button>
+    </nav>
 
-    <section class="panel controls-panel" data-view-target="market">
-      <div class="deposit-wrap">
-        <h2>Deposit Funds</h2>
-        <div class="deposit-controls">
-          <input id="depositInput" type="number" min="1" step="1" placeholder="Enter amount" />
-          <button class="btn btn-gold" id="depositBtn">Deposit</button>
+    <!-- Main Content -->
+    <main id="mainContent" class="main-content">
+
+      <!-- ===== CASE ROOM ===== -->
+      <section id="caseRoom" class="view-section view-section--active">
+        <div class="section-head">
+          <h2>Case Market</h2>
+          <p class="muted">Blue 79.92% | Purple 15.98% | Pink 3.2% | Red 0.64% | Gold 0.26%</p>
         </div>
-        <div class="chips" id="chips"></div>
-      </div>
-      <div class="automation-wrap">
-        <h2>Auto-Open Queue</h2>
-        <div class="auto-row">
-          <input id="autoCount" type="number" min="1" max="25" step="1" value="5" />
-          <button class="btn" id="autoBtn">Start Queue</button>
-          <button class="btn btn-danger" id="stopAutoBtn">Stop</button>
+        <div class="auto-bar" id="autoBar">
+          <p class="muted" id="autoBarStatus">Select a case to begin.</p>
+          <button class="btn btn-danger btn--sm hidden" id="autoBarStop">Stop Queue</button>
         </div>
-        <p class="muted" id="autoStatus">No active queue.</p>
-      </div>
-    </section>
+        <div class="case-grid" id="caseGrid"></div>
+      </section>
 
-    <section class="panel cases-panel" data-view-target="market">
-      <div class="title-row">
-        <h2>Premium Case Collection</h2>
-        <p class="muted">Blue 79.92% | Purple 15.98% | Pink 3.2% | Red 0.64% | Gold 0.26%</p>
-      </div>
-      <div class="case-grid" id="caseGrid"></div>
-    </section>
-
-    <section class="panel last-drop-panel" data-view-target="market">
-      <div class="title-row">
-        <h2>Latest Reveal</h2>
-        <p class="muted" id="activeCaseLabel">Select a case to begin your journey.</p>
-      </div>
-      <div class="last-drop-card">
-        <img id="resultImage" class="item-thumb" alt="Drop reveal" />
-        <div>
-          <p id="resultText">Your next revelation appears here.</p>
-          <h3 id="resultItem">---</h3>
+      <!-- ===== INVENTORY ===== -->
+      <section id="inventory" class="view-section">
+        <div class="section-head">
+          <h2>Inventory</h2>
+          <div class="inventory-actions">
+            <button class="btn btn--sm" id="sellBlueBtn">Sell Blues</button>
+            <button class="btn btn--sm" id="sellAllBtn">Sell All</button>
+          </div>
         </div>
-      </div>
-    </section>
-
-    <section class="panel analytics-panel">
-      <div>
-        <h2>Session Analytics</h2>
-        <p class="muted" id="statsLine">Opened: 0 | Spent: $0.00 | Sold: $0.00</p>
-      </div>
-      <div class="rarity-bars" id="rarityBars"></div>
-    </section>
-
-    <section class="panel inventory-panel" data-view-target="inventory">
-      <div class="title-row">
-        <h2>Your Collection</h2>
-        <div class="inventory-actions">
-          <button class="btn" id="sellBlueBtn">Liquidate Blues</button>
-          <button class="btn" id="sellAllBtn">Liquidate All</button>
+        <h3>Owned Cases</h3>
+        <div class="case-inventory-list" id="caseInventoryList"></div>
+        <h3>Opened Items</h3>
+        <div class="inventory-controls">
+          <input type="text" id="invSearchInput" class="inv-search" placeholder="Search items..." />
+          <select id="invSortSelect" class="inv-sort">
+            <option value="date-desc">Newest First</option>
+            <option value="date-asc">Oldest First</option>
+            <option value="value-desc">Value: High to Low</option>
+            <option value="value-asc">Value: Low to High</option>
+            <option value="tier-desc">Tier: Best First</option>
+            <option value="tier-asc">Tier: Worst First</option>
+          </select>
         </div>
-      </div>
-      <h3>Unopened Cases</h3>
-      <div class="case-inventory-list" id="caseInventoryList"></div>
-      <h3>Acquired Items</h3>
-      <div class="inventory-list" id="inventoryList"></div>
-    </section>
+        <div class="inventory-list" id="inventoryList"></div>
+      </section>
 
-    <section class="panel history-panel" data-view-target="history">
-      <div class="title-row">
-        <h2>Opening History</h2>
-        <p class="muted">Your recent revelations.</p>
-      </div>
-      <div class="history-list" id="historyList"></div>
-    </section>
-  </main>
+      <!-- ===== HISTORY ===== -->
+      <section id="history" class="view-section">
+        <div class="section-head">
+          <h2>Drop History</h2>
+          <p class="muted">Latest openings first.</p>
+        </div>
+        <div class="history-list" id="historyList"></div>
+      </section>
 
+      <!-- ===== STATS ===== -->
+      <section id="stats" class="view-section">
+        <div class="section-head">
+          <h2>Session Analytics</h2>
+          <p class="muted" id="statsLine">Opened: 0 | Spent: $0.00 | Sold: $0.00</p>
+        </div>
+        <div class="streak-display" id="streakDisplay"></div>
+        <div class="rarity-bars" id="rarityBars"></div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ===== BOTTOM NAV (mobile) ===== -->
+  <nav id="bottomNav" class="bottom-nav">
+    <button class="bottom-nav__item bottom-nav__item--active" data-section="caseRoom">
+      <svg class="bottom-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>
+      Cases
+    </button>
+    <button class="bottom-nav__item" data-section="inventory">
+      <svg class="bottom-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+      Inventory
+      <span class="bottom-nav__badge hidden" id="invCountBadgeMobile">0</span>
+    </button>
+    <button class="bottom-nav__item" data-section="history">
+      <svg class="bottom-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      History
+    </button>
+    <button class="bottom-nav__item" data-section="stats">
+      <svg class="bottom-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      Stats
+    </button>
+  </nav>
+
+  <!-- ===== TOAST NOTIFICATIONS ===== -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- ===== OPENING OVERLAY ===== -->
   <section class="opening-overlay hidden" id="openingOverlay">
     <div class="opening-frame">
       <div class="opening-head">
         <p class="muted" id="overlayCaseName">Opening...</p>
         <div class="overlay-buttons">
-          <button class="btn btn-danger" id="skipSpinBtn">Skip Animation</button>
-          <button class="btn hidden-action" id="closeOverlayBtn">Continue</button>
+          <button class="btn btn-danger" id="skipSpinBtn">Skip</button>
+          <button class="btn hidden-action" id="closeOverlayBtn">Close</button>
         </div>
       </div>
       <div id="singleOpenView">
@@ -137,9 +183,10 @@
           </div>
         </div>
         <div class="overlay-result">
-          <img id="overlayResultImage" class="item-thumb overlay-thumb" alt="Revealed item" />
-          <p id="overlayResultText">Revealing...</p>
+          <img id="overlayResultImage" class="item-thumb overlay-thumb" alt="Result image" />
+          <p id="overlayResultText">Rolling...</p>
           <h2 id="overlayResultItem">---</h2>
+          <p class="fair-badge" id="overlayFairBadge"></p>
         </div>
       </div>
 
@@ -149,16 +196,23 @@
     </div>
   </section>
 
+  <!-- ===== TEMPLATES ===== -->
   <template id="caseTemplate">
     <article class="case-card">
-      <div>
-        <h3 class="case-name"></h3>
-        <p class="case-desc"></p>
+      <div class="case-card__header">
+        <h3 class="case-card__name"></h3>
+        <span class="case-card__badge">0</span>
       </div>
-      <p class="case-price"></p>
-      <div class="case-actions">
-        <button class="btn btn-open">Acquire</button>
-        <button class="btn btn-alt preview-btn">Details</button>
+      <p class="case-card__desc"></p>
+      <div class="case-card__jackpot">
+        <img class="case-card__jackpot-img" alt="Jackpot preview" />
+        <span class="case-card__jackpot-name"></span>
+      </div>
+      <p class="case-card__price"></p>
+      <div class="case-card__actions">
+        <button class="btn btn-gold btn--sm case-card__buy">Buy</button>
+        <button class="btn btn-open btn--sm case-card__buy-open">Buy & Open</button>
+        <button class="btn btn-alt btn--sm case-card__details">Details</button>
       </div>
     </article>
   </template>
@@ -170,7 +224,7 @@
         <p class="inventory-name"></p>
         <p class="inventory-meta"></p>
       </div>
-      <button class="btn btn-gold sell-btn">Liquidate</button>
+      <button class="btn btn-gold btn--sm sell-btn">Sell</button>
     </article>
   </template>
 
@@ -182,7 +236,7 @@
       </div>
       <div class="case-open-controls">
         <input class="multi-open-input" type="number" min="1" max="10" step="1" value="1" />
-        <button class="btn btn-open open-owned-btn">Unveil</button>
+        <button class="btn btn-open btn--sm open-owned-btn">Open</button>
       </div>
     </article>
   </template>
@@ -197,20 +251,30 @@
     </article>
   </template>
 
+  <!-- ===== CASE DETAIL DIALOG ===== -->
   <dialog id="caseDialog" class="preview-dialog">
     <div class="dialog-head">
       <h3 id="caseDialogTitle">Case Details</h3>
-      <button class="btn btn-danger" id="closeCaseDialog">Close</button>
+      <button class="btn btn-danger btn--sm" id="closeCaseDialog">Close</button>
     </div>
     <p class="muted" id="caseDialogMeta"></p>
     <p class="muted" id="caseOwnedInfo"></p>
     <div class="case-dialog-actions">
       <input id="caseQtyInput" type="number" min="1" max="10" step="1" value="1" />
-      <button class="btn btn-gold" id="caseBuyBtn">Acquire Qty</button>
-      <button class="btn btn-open" id="caseOpenBtn">Unveil Qty</button>
-      <button class="btn" id="caseOpenMaxBtn">Unveil 10 Now</button>
-      <button class="btn" id="caseSellBtn">Liquidate Qty</button>
-      <button class="btn btn-danger" id="caseSellAllBtn">Liquidate All</button>
+      <button class="btn btn-gold btn--sm" id="caseBuyBtn">Buy Qty</button>
+      <button class="btn btn-open btn--sm" id="caseOpenBtn">Open Qty</button>
+      <button class="btn btn--sm" id="caseOpenMaxBtn">Open 10</button>
+      <button class="btn btn--sm" id="caseSellBtn">Sell Qty</button>
+      <button class="btn btn-danger btn--sm" id="caseSellAllBtn">Sell All</button>
+    </div>
+    <div class="case-dialog-auto">
+      <h4>Auto Open Queue</h4>
+      <div class="auto-row">
+        <input id="autoCount" type="number" min="1" max="25" step="1" value="5" />
+        <button class="btn btn--sm" id="autoBtn">Start Queue</button>
+        <button class="btn btn-danger btn--sm" id="stopAutoBtn">Stop</button>
+      </div>
+      <p class="muted" id="autoStatus">No queue active.</p>
     </div>
     <div id="caseDialogItems" class="preview-content"></div>
   </dialog>

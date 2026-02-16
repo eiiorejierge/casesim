@@ -9,6 +9,8 @@ const odds = [
   { tier: "gold", label: "Special", chance: 0.26, color: "var(--rare-gold)" },
 ];
 
+const tierRank = { gold: 5, red: 4, pink: 3, purple: 2, blue: 1 };
+
 const rawCases = [
   {
     id: "metro-luxe",
@@ -376,30 +378,39 @@ const cases = rawCases.map((itemCase) => ({
   ),
 }));
 
+/* ===== DOM REFS ===== */
 const els = {
   balance: document.getElementById("balance"),
   invValue: document.getElementById("invValue"),
   netWorth: document.getElementById("netWorth"),
+  sessionPnl: document.getElementById("sessionPnl"),
   depositInput: document.getElementById("depositInput"),
   depositBtn: document.getElementById("depositBtn"),
-  resetBtn: document.getElementById("resetBtn"),
   chips: document.getElementById("chips"),
+  resetBtn: document.getElementById("resetBtn"),
+  fastModeToggle: document.getElementById("fastModeToggle"),
+  sidebar: document.getElementById("sidebar"),
+  bottomNav: document.getElementById("bottomNav"),
+  invCountBadge: document.getElementById("invCountBadge"),
+  invCountBadgeMobile: document.getElementById("invCountBadgeMobile"),
+  caseGrid: document.getElementById("caseGrid"),
+  autoBarStatus: document.getElementById("autoBarStatus"),
+  autoBarStop: document.getElementById("autoBarStop"),
   autoCount: document.getElementById("autoCount"),
   autoBtn: document.getElementById("autoBtn"),
   stopAutoBtn: document.getElementById("stopAutoBtn"),
   autoStatus: document.getElementById("autoStatus"),
-  caseGrid: document.getElementById("caseGrid"),
-  activeCaseLabel: document.getElementById("activeCaseLabel"),
-  resultText: document.getElementById("resultText"),
-  resultItem: document.getElementById("resultItem"),
-  resultImage: document.getElementById("resultImage"),
-  statsLine: document.getElementById("statsLine"),
-  rarityBars: document.getElementById("rarityBars"),
+  sellBlueBtn: document.getElementById("sellBlueBtn"),
+  sellAllBtn: document.getElementById("sellAllBtn"),
+  invSearchInput: document.getElementById("invSearchInput"),
+  invSortSelect: document.getElementById("invSortSelect"),
   caseInventoryList: document.getElementById("caseInventoryList"),
   inventoryList: document.getElementById("inventoryList"),
   historyList: document.getElementById("historyList"),
-  sellBlueBtn: document.getElementById("sellBlueBtn"),
-  sellAllBtn: document.getElementById("sellAllBtn"),
+  statsLine: document.getElementById("statsLine"),
+  streakDisplay: document.getElementById("streakDisplay"),
+  rarityBars: document.getElementById("rarityBars"),
+  toastContainer: document.getElementById("toastContainer"),
   caseDialog: document.getElementById("caseDialog"),
   caseDialogTitle: document.getElementById("caseDialogTitle"),
   caseDialogMeta: document.getElementById("caseDialogMeta"),
@@ -423,22 +434,25 @@ const els = {
   overlayResultText: document.getElementById("overlayResultText"),
   overlayResultItem: document.getElementById("overlayResultItem"),
   overlayResultImage: document.getElementById("overlayResultImage"),
-  viewTabs: document.getElementById("viewTabs"),
-  viewPanels: document.querySelectorAll("[data-view-target]"),
+  overlayFairBadge: document.getElementById("overlayFairBadge"),
   caseTemplate: document.getElementById("caseTemplate"),
   caseInventoryTemplate: document.getElementById("caseInventoryTemplate"),
   inventoryTemplate: document.getElementById("inventoryTemplate"),
   historyTemplate: document.getElementById("historyTemplate"),
 };
 
+/* ===== STATE ===== */
 function defaultStats() {
   return {
     opened: 0,
     spent: 0,
     sold: 0,
+    deposited: 0,
     rarityHits: { blue: 0, purple: 0, pink: 0, red: 0, gold: 0 },
     bestDropValue: 0,
     bestDropName: "-",
+    currentStreak: { tier: null, count: 0 },
+    bestStreak: { tier: null, count: 0 },
   };
 }
 
@@ -446,11 +460,12 @@ function freshState() {
   return {
     balance: 0,
     selectedCaseId: cases[0].id,
-    currentView: "market",
+    currentView: "caseRoom",
     ownedCases: {},
     inventory: [],
     history: [],
     stats: defaultStats(),
+    fastOpen: false,
     opening: false,
     detailCaseId: null,
     autoQueue: 0,
@@ -463,6 +478,7 @@ function freshState() {
 const state = freshState();
 const quickChips = [100, 250, 500, 1000, 5000];
 
+/* ===== HELPERS ===== */
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
@@ -473,6 +489,14 @@ function getCaseById(id) {
 
 function ownedCaseCount(caseId) {
   return Math.max(0, Math.floor(Number(state.ownedCases[caseId]) || 0));
+}
+
+function totalOwnedItems() {
+  return state.inventory.length;
+}
+
+function totalOwnedCases() {
+  return Object.values(state.ownedCases).reduce((s, n) => s + Math.max(0, Math.floor(Number(n) || 0)), 0);
 }
 
 function hydrateEntry(entry) {
@@ -487,6 +511,7 @@ function hydrateEntry(entry) {
   };
 }
 
+/* ===== PERSISTENCE ===== */
 function saveState() {
   localStorage.setItem(
     STORAGE_KEY,
@@ -498,6 +523,7 @@ function saveState() {
       inventory: state.inventory,
       history: state.history,
       stats: state.stats,
+      fastOpen: state.fastOpen,
     })
   );
 }
@@ -512,7 +538,12 @@ function loadState() {
 
     state.balance = Number(data.balance) || 0;
     state.selectedCaseId = getCaseById(data.selectedCaseId).id;
-    state.currentView = ["market", "inventory", "history"].includes(data.currentView) ? data.currentView : "market";
+
+    // Migrate old "market" -> "caseRoom"
+    let view = data.currentView;
+    if (view === "market") view = "caseRoom";
+    state.currentView = ["caseRoom", "inventory", "history", "stats"].includes(view) ? view : "caseRoom";
+
     state.ownedCases = {};
     if (data.ownedCases && typeof data.ownedCases === "object") {
       Object.keys(data.ownedCases).forEach((caseId) => {
@@ -521,21 +552,29 @@ function loadState() {
         if (itemCase && count > 0) state.ownedCases[itemCase.id] = count;
       });
     }
+
     state.inventory = Array.isArray(data.inventory) ? data.inventory.map(hydrateEntry) : [];
     state.history = Array.isArray(data.history) ? data.history.map(hydrateEntry) : [];
+
+    const ds = defaultStats();
+    const savedStats = data.stats || {};
     state.stats = {
-      ...defaultStats(),
-      ...(data.stats || {}),
-      rarityHits: {
-        ...defaultStats().rarityHits,
-        ...((data.stats && data.stats.rarityHits) || {}),
-      },
+      ...ds,
+      ...savedStats,
+      rarityHits: { ...ds.rarityHits, ...(savedStats.rarityHits || {}) },
+      deposited: Number(savedStats.deposited) || 0,
+      currentStreak: savedStats.currentStreak || ds.currentStreak,
+      bestStreak: savedStats.bestStreak || ds.bestStreak,
     };
+
+    state.fastOpen = Boolean(data.fastOpen);
+    if (els.fastModeToggle) els.fastModeToggle.checked = state.fastOpen;
   } catch (_error) {
     localStorage.removeItem(STORAGE_KEY);
   }
 }
 
+/* ===== WALLET ===== */
 function inventoryTotal() {
   return state.inventory.reduce((sum, item) => sum + item.value, 0);
 }
@@ -545,17 +584,124 @@ function refreshWallet() {
   els.balance.textContent = money(state.balance);
   els.invValue.textContent = money(inv);
   els.netWorth.textContent = money(state.balance + inv);
+  refreshPnl();
+  refreshBadges();
 }
 
+function refreshPnl() {
+  const pnl = state.balance + inventoryTotal() - state.stats.deposited;
+  const el = els.sessionPnl;
+  el.textContent = `${pnl >= 0 ? "+" : ""}${money(pnl)}`;
+  el.className = "wallet-stat__value " +
+    (pnl > 0 ? "wallet-stat__value--profit" : pnl < 0 ? "wallet-stat__value--loss" : "wallet-stat__value--neutral");
+}
+
+function refreshBadges() {
+  const total = totalOwnedItems() + totalOwnedCases();
+  [els.invCountBadge, els.invCountBadgeMobile].forEach((badge) => {
+    if (!badge) return;
+    badge.textContent = String(total);
+    badge.classList.toggle("hidden", total === 0);
+  });
+}
+
+/* ===== TOAST SYSTEM ===== */
+function showToast(message, itemName, tier, image, options = {}) {
+  const container = els.toastContainer;
+  const toast = document.createElement("div");
+  const isProfit = options.profit === true;
+  const isLoss = options.profit === false;
+
+  toast.className = `toast ${isProfit ? "toast--profit" : ""} ${isLoss ? "toast--loss" : ""}`.trim();
+  toast.innerHTML = `
+    <img class="toast__img" src="${image}" alt="${itemName}" />
+    <div class="toast__body">
+      <p class="toast__title ${tierClass(tier)}">${itemName}</p>
+      <p class="toast__meta">${message}</p>
+    </div>
+  `;
+
+  toast.addEventListener("click", () => dismissToast(toast));
+  container.appendChild(toast);
+
+  setTimeout(() => dismissToast(toast), 4000);
+
+  while (container.children.length > 5) {
+    dismissToast(container.firstElementChild);
+  }
+}
+
+function dismissToast(toast) {
+  if (!toast || toast.classList.contains("toast--exiting")) return;
+  toast.classList.add("toast--exiting");
+  toast.addEventListener("animationend", () => toast.remove());
+}
+
+/* ===== CONFETTI ===== */
+function fireConfetti(tier) {
+  const colors = {
+    pink: ["#ed7ed2", "#f5a2df", "#ff9ecf", "#ffffff"],
+    red: ["#ff7575", "#ff9e9e", "#ffcccc", "#ffffff"],
+    gold: ["#ffe8a8", "#ffd88d", "#ffc45d", "#ffffff", "#ffec80"],
+  };
+
+  const palette = colors[tier];
+  if (!palette) return;
+
+  const container = document.createElement("div");
+  container.className = "confetti-container";
+  document.body.appendChild(container);
+
+  const particleCount = tier === "gold" ? 80 : 45;
+
+  for (let i = 0; i < particleCount; i++) {
+    const p = document.createElement("div");
+    p.className = "confetti-particle";
+    const angle = Math.random() * Math.PI * 2;
+    const velocity = 200 + Math.random() * 400;
+    const duration = 1200 + Math.random() * 800;
+
+    p.style.left = "50%";
+    p.style.top = "40%";
+    p.style.background = palette[Math.floor(Math.random() * palette.length)];
+    p.style.width = `${4 + Math.random() * 8}px`;
+    p.style.height = `${4 + Math.random() * 8}px`;
+    p.style.setProperty("--dx", `${Math.cos(angle) * velocity}px`);
+    p.style.setProperty("--dy", `${Math.sin(angle) * velocity}px`);
+    p.style.setProperty("--rot", `${Math.random() * 720}deg`);
+    p.style.setProperty("--duration", `${duration}ms`);
+
+    container.appendChild(p);
+  }
+
+  setTimeout(() => container.remove(), 2200);
+}
+
+/* ===== STREAK ===== */
+function updateStreak(tier) {
+  if (state.stats.currentStreak.tier === tier) {
+    state.stats.currentStreak.count += 1;
+  } else {
+    state.stats.currentStreak = { tier, count: 1 };
+  }
+
+  if (state.stats.currentStreak.count > (state.stats.bestStreak.count || 0)) {
+    state.stats.bestStreak = { ...state.stats.currentStreak };
+  }
+}
+
+/* ===== VIEW RENDERING ===== */
 function renderView() {
-  els.viewPanels.forEach((panel) => {
-    const target = panel.getAttribute("data-view-target");
-    panel.classList.toggle("hidden-view", target !== state.currentView);
+  document.querySelectorAll(".view-section").forEach((section) => {
+    section.classList.toggle("view-section--active", section.id === state.currentView);
   });
 
-  const tabButtons = els.viewTabs.querySelectorAll(".tab-btn");
-  tabButtons.forEach((button) => {
-    button.classList.toggle("active", button.dataset.view === state.currentView);
+  document.querySelectorAll(".sidebar__item[data-section]").forEach((btn) => {
+    btn.classList.toggle("sidebar__item--active", btn.dataset.section === state.currentView);
+  });
+
+  document.querySelectorAll(".bottom-nav__item[data-section]").forEach((btn) => {
+    btn.classList.toggle("bottom-nav__item--active", btn.dataset.section === state.currentView);
   });
 }
 
@@ -565,27 +711,29 @@ function renderChips() {
     const chip = document.createElement("button");
     chip.type = "button";
     chip.className = "chip";
-    chip.textContent = `+${money(amount)}`;
+    chip.textContent = `+$${amount}`;
     chip.addEventListener("click", () => {
       state.balance += amount;
+      state.stats.deposited += amount;
       refreshWallet();
       saveState();
-      setResult(`Deposited ${money(amount)} into your account.`, "Funds Added", "gold", makeItemImage("Funded", "gold", "VaultSpin"));
+      showToast(`Deposited ${money(amount)} fake cash.`, "Funded", "gold", makeItemImage("Funded", "gold", "VaultSpin"));
     });
     els.chips.appendChild(chip);
   });
 }
 
+/* ===== RNG ===== */
 function weightedTierRoll() {
   const roll = Math.random() * 100;
   let running = 0;
 
   for (const entry of odds) {
     running += entry.chance;
-    if (roll <= running) return entry.tier;
+    if (roll <= running) return { tier: entry.tier, roll: roll.toFixed(4) };
   }
 
-  return "blue";
+  return { tier: "blue", roll: roll.toFixed(4) };
 }
 
 function randomItemFromTier(itemCase, tier) {
@@ -594,10 +742,16 @@ function randomItemFromTier(itemCase, tier) {
 }
 
 function rollItem(itemCase) {
-  const tier = weightedTierRoll();
-  return randomItemFromTier(itemCase, tier);
+  const { tier, roll } = weightedTierRoll();
+  const item = randomItemFromTier(itemCase, tier);
+  return {
+    ...item,
+    rollValue: roll,
+    seed: Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
+  };
 }
 
+/* ===== REEL SPIN ===== */
 function makeReelSpin(itemCase, winner) {
   const slots = [];
   const targetIndex = 34;
@@ -644,7 +798,7 @@ function runSpinAnimation(reelTrackEl, targetIndex) {
   return new Promise((resolve) => {
     const reelWindow = reelTrackEl.parentElement;
     const firstSlot = reelTrackEl.firstElementChild;
-    const slotWidth = firstSlot ? firstSlot.getBoundingClientRect().width : 180;
+    const slotWidth = firstSlot ? firstSlot.getBoundingClientRect().width : 160;
     const stopAt = targetIndex * slotWidth - (reelWindow.clientWidth / 2 - slotWidth / 2);
     let finished = false;
     let skipper = null;
@@ -673,21 +827,22 @@ function runSpinAnimation(reelTrackEl, targetIndex) {
     reelTrackEl.style.transform = "translateX(0px)";
 
     requestAnimationFrame(() => {
-      reelTrackEl.style.transition = "transform 2.65s cubic-bezier(0.15, 0.75, 0.15, 1)";
+      reelTrackEl.style.transition = "transform 2.45s cubic-bezier(0.1, 0.72, 0.12, 1)";
       reelTrackEl.style.transform = `translateX(-${stopAt}px)`;
     });
 
-    window.setTimeout(finish, 2800);
+    window.setTimeout(finish, 2600);
   });
 }
 
 function showOverlay(caseName, mode = "single") {
   setOverlayMode(mode);
-  els.overlayCaseName.textContent = `Unveiling ${caseName}`;
-  els.overlayResultText.textContent = "Revealing...";
+  els.overlayCaseName.textContent = `Opening ${caseName}`;
+  els.overlayResultText.textContent = "Rolling...";
   els.overlayResultItem.textContent = "---";
   els.overlayResultItem.className = "";
   els.overlayResultImage.src = makeItemImage("Rolling", "blue", caseName);
+  els.overlayFairBadge.textContent = "";
   els.closeOverlayBtn.classList.remove("show");
   state.spinSkippers = [];
   els.openingOverlay.classList.remove("hidden");
@@ -707,51 +862,59 @@ function waitForOverlayClose() {
   });
 }
 
+/* ===== CASE RENDERING ===== */
 function renderCases() {
   els.caseGrid.innerHTML = "";
 
   cases.forEach((itemCase, index) => {
     const card = els.caseTemplate.content.firstElementChild.cloneNode(true);
-    card.style.animationDelay = `${index * 70}ms`;
-    card.querySelector(".case-name").textContent = itemCase.name;
-    card.querySelector(".case-desc").textContent = itemCase.description;
-    card.querySelector(".case-price").textContent = `${money(itemCase.price)}`;
+    card.style.animationDelay = `${index * 60}ms`;
+
+    card.querySelector(".case-card__name").textContent = itemCase.name;
+    card.querySelector(".case-card__desc").textContent = itemCase.description;
+    card.querySelector(".case-card__price").textContent = `Cost ${money(itemCase.price)}`;
+
+    const owned = ownedCaseCount(itemCase.id);
+    const badge = card.querySelector(".case-card__badge");
+    badge.textContent = String(owned);
+    if (owned > 0) badge.classList.add("case-card__badge--visible");
+
+    const jackpotItem = itemCase.items.gold[0];
+    card.querySelector(".case-card__jackpot-img").src = jackpotItem.image;
+    card.querySelector(".case-card__jackpot-name").textContent =
+      `${jackpotItem.name} (${money(jackpotItem.value)})`;
 
     if (itemCase.id === state.selectedCaseId) card.classList.add("selected");
 
-    const buyBtn = card.querySelector(".btn-open");
-    buyBtn.textContent = "Acquire";
-    buyBtn.addEventListener("click", () => {
+    card.querySelector(".case-card__buy").addEventListener("click", (e) => {
+      e.stopPropagation();
       state.selectedCaseId = itemCase.id;
-      renderCases();
-      renderActiveCase();
       buyCase(itemCase.id);
+      renderCases();
     });
 
-    const detailBtn = card.querySelector(".preview-btn");
-    detailBtn.textContent = "Details";
-    detailBtn.addEventListener("click", () => {
+    card.querySelector(".case-card__buy-open").addEventListener("click", (e) => {
+      e.stopPropagation();
       state.selectedCaseId = itemCase.id;
       renderCases();
-      renderActiveCase();
+      buyAndOpenCase(itemCase.id);
+    });
+
+    card.querySelector(".case-card__details").addEventListener("click", (e) => {
+      e.stopPropagation();
+      state.selectedCaseId = itemCase.id;
+      renderCases();
       openCaseDetail(itemCase.id);
     });
 
-    card.addEventListener("click", (event) => {
-      if (event.target.closest("button")) return;
+    card.addEventListener("click", () => {
       state.selectedCaseId = itemCase.id;
       renderCases();
-      renderActiveCase();
       openCaseDetail(itemCase.id);
     });
 
     els.caseGrid.appendChild(card);
   });
-}
-
-function renderActiveCase() {
-  const itemCase = getCaseById(state.selectedCaseId);
-  els.activeCaseLabel.textContent = `${itemCase.name} selected | Price: ${money(itemCase.price)} | Owned: ${ownedCaseCount(itemCase.id)}`;
 }
 
 function renderCaseInventory() {
@@ -763,7 +926,7 @@ function renderCaseInventory() {
   if (owned.length === 0) {
     const empty = document.createElement("p");
     empty.className = "muted";
-    empty.textContent = "No unopened cases. Acquire cases in the market first.";
+    empty.textContent = "No unopened cases. Buy cases in Case Market first.";
     els.caseInventoryList.appendChild(empty);
     return;
   }
@@ -773,31 +936,67 @@ function renderCaseInventory() {
     const multiInput = row.querySelector(".multi-open-input");
     const openButton = row.querySelector(".open-owned-btn");
     row.querySelector(".case-inv-name").textContent = itemCase.name;
-    row.querySelector(".case-inv-meta").textContent = `Owned: ${count} | Value: ${money(itemCase.price)}`;
+    row.querySelector(".case-inv-meta").textContent = `Owned: ${count} | Buy Price: ${money(itemCase.price)}`;
     multiInput.max = String(Math.min(10, count));
     openButton.addEventListener("click", () => {
       const desired = clamp(Number(multiInput.value) || 1, 1, 10);
       state.selectedCaseId = itemCase.id;
-      renderCases();
-      renderActiveCase();
       openMultipleCases(itemCase.id, desired);
     });
     els.caseInventoryList.appendChild(row);
   });
 }
 
+/* ===== INVENTORY SORT/FILTER ===== */
+function getFilteredInventory() {
+  const query = (els.invSearchInput.value || "").toLowerCase().trim();
+  const sort = els.invSortSelect.value || "date-desc";
+
+  let items = state.inventory.map((item, index) => ({ ...item, _origIndex: index }));
+
+  if (query) {
+    items = items.filter((item) =>
+      item.name.toLowerCase().includes(query) ||
+      (item.source || "").toLowerCase().includes(query) ||
+      item.tier.toLowerCase().includes(query)
+    );
+  }
+
+  switch (sort) {
+    case "date-asc":
+      items.reverse();
+      break;
+    case "value-desc":
+      items.sort((a, b) => b.value - a.value);
+      break;
+    case "value-asc":
+      items.sort((a, b) => a.value - b.value);
+      break;
+    case "tier-desc":
+      items.sort((a, b) => (tierRank[b.tier] || 0) - (tierRank[a.tier] || 0));
+      break;
+    case "tier-asc":
+      items.sort((a, b) => (tierRank[a.tier] || 0) - (tierRank[b.tier] || 0));
+      break;
+  }
+
+  return items;
+}
+
 function renderInventory() {
   els.inventoryList.innerHTML = "";
 
-  if (state.inventory.length === 0) {
+  const items = getFilteredInventory();
+
+  if (items.length === 0) {
     const empty = document.createElement("p");
     empty.className = "muted";
-    empty.textContent = "No items yet.";
+    empty.textContent = state.inventory.length === 0 ? "No items yet." : "No matching items.";
     els.inventoryList.appendChild(empty);
     return;
   }
 
-  state.inventory.forEach((item, index) => {
+  items.forEach((item) => {
     const row = els.inventoryTemplate.content.firstElementChild.cloneNode(true);
     const thumb = row.querySelector(".inventory-thumb");
     const name = row.querySelector(".inventory-name");
@@ -809,7 +1008,7 @@ function renderInventory() {
     name.className = `inventory-name ${tierClass(item.tier)}`;
     name.textContent = item.name;
     meta.textContent = `${item.tier.toUpperCase()} | ${item.source} | ${money(item.value)}`;
-    sellBtn.addEventListener("click", () => sellItem(index));
+    sellBtn.addEventListener("click", () => sellItem(item._origIndex));
 
     els.inventoryList.appendChild(row);
   });
@@ -826,7 +1025,7 @@ function renderHistory() {
     return;
   }
 
-  state.history.slice(0, 30).forEach((entry) => {
+  state.history.slice(0, 50).forEach((entry) => {
     const row = els.historyTemplate.content.firstElementChild.cloneNode(true);
     const thumb = row.querySelector(".history-thumb");
     const title = row.querySelector(".history-title");
@@ -836,7 +1035,9 @@ function renderHistory() {
     thumb.alt = entry.name;
     title.className = `history-title ${tierClass(entry.tier)}`;
     title.textContent = entry.name;
-    meta.textContent = `${entry.caseName} | ${money(entry.value)} | ${entry.time}`;
+
+    const rollInfo = entry.rollValue ? ` | Roll: ${entry.rollValue}` : "";
+    meta.textContent = `${entry.caseName} | ${money(entry.value)}${rollInfo} | ${entry.time}`;
 
     els.historyList.appendChild(row);
   });
@@ -845,6 +1046,26 @@ function renderHistory() {
 function renderStats() {
   els.statsLine.textContent = `Opened: ${state.stats.opened} | Spent: ${money(state.stats.spent)} | Sold: ${money(state.stats.sold)} | Best: ${state.stats.bestDropName} (${money(state.stats.bestDropValue)})`;
 
+  // Streak display
+  els.streakDisplay.innerHTML = "";
+  const cs = state.stats.currentStreak;
+  const bs = state.stats.bestStreak;
+
+  if (cs.tier && cs.count > 1) {
+    const card = document.createElement("div");
+    card.className = "streak-card";
+    card.innerHTML = `Current: <strong class="${tierClass(cs.tier)}">${cs.count}x ${cs.tier}</strong>`;
+    els.streakDisplay.appendChild(card);
+  }
+
+  if (bs.tier && bs.count > 1) {
+    const card = document.createElement("div");
+    card.className = "streak-card";
+    card.innerHTML = `Best: <strong class="${tierClass(bs.tier)}">${bs.count}x ${bs.tier}</strong>`;
+    els.streakDisplay.appendChild(card);
+  }
+
+  // Rarity bars
   const total = Math.max(1, state.stats.opened);
   els.rarityBars.innerHTML = "";
 
@@ -876,67 +1097,7 @@ function renderStats() {
   });
 }
 
-function setResult(message, itemName, tier, image) {
-  els.resultText.textContent = message;
-  els.resultItem.className = tier ? tierClass(tier) : "";
-  els.resultItem.textContent = itemName;
-  if (image) {
-    els.resultImage.src = image;
-    els.resultImage.alt = itemName;
-  }
-}
-
-function updateAll() {
-  refreshWallet();
-  renderActiveCase();
-  renderCaseInventory();
-  renderInventory();
-  renderHistory();
-  renderStats();
-  renderView();
-  renderCaseDetail();
-}
-
-function sellItem(index) {
-  const item = state.inventory[index];
-  if (!item) return;
-
-  state.balance += item.value;
-  state.stats.sold += item.value;
-  state.inventory.splice(index, 1);
-
-  refreshWallet();
-  renderInventory();
-  renderStats();
-  saveState();
-  setResult(`Liquidated for ${money(item.value)}.`, item.name, item.tier, item.image);
-}
-
-function sellByTier(tier) {
-  const kept = [];
-  let sold = 0;
-
-  state.inventory.forEach((item) => {
-    if (tier && item.tier !== tier) {
-      kept.push(item);
-      return;
-    }
-    sold += item.value;
-  });
-
-  state.inventory = kept;
-  state.balance += sold;
-  state.stats.sold += sold;
-
-  refreshWallet();
-  renderInventory();
-  renderStats();
-  saveState();
-
-  const label = tier ? `${tier.toUpperCase()} Items Liquidated` : "All Items Liquidated";
-  setResult(`Liquidated items for ${money(sold)}.`, label, tier || "gold", makeItemImage(label, tier || "gold", "VaultSpin"));
-}
-
+/* ===== CASE DETAIL DIALOG ===== */
 function renderCaseDetail() {
   if (!state.detailCaseId) return;
   const itemCase = getCaseById(state.detailCaseId);
@@ -984,6 +1145,47 @@ function openCaseDetail(caseId) {
   els.caseDialog.showModal();
 }
 
+/* ===== ECONOMY ACTIONS ===== */
+function sellItem(index) {
+  const item = state.inventory[index];
+  if (!item) return;
+
+  state.balance += item.value;
+  state.stats.sold += item.value;
+  state.inventory.splice(index, 1);
+
+  refreshWallet();
+  renderInventory();
+  renderStats();
+  saveState();
+  showToast(`Sold for ${money(item.value)}.`, item.name, item.tier, item.image);
+}
+
+function sellByTier(tier) {
+  const kept = [];
+  let sold = 0;
+
+  state.inventory.forEach((item) => {
+    if (tier && item.tier !== tier) {
+      kept.push(item);
+      return;
+    }
+    sold += item.value;
+  });
+
+  state.inventory = kept;
+  state.balance += sold;
+  state.stats.sold += sold;
+
+  refreshWallet();
+  renderInventory();
+  renderStats();
+  saveState();
+
+  const label = tier ? `Sold ${tier.toUpperCase()} items` : "Sold Everything";
+  showToast(`Sold items for ${money(sold)}.`, label, tier || "gold", makeItemImage(label, tier || "gold", "VaultSpin"));
+}
+
 function sellOwnedCases(caseId, qty) {
   const itemCase = getCaseById(caseId);
   const owned = ownedCaseCount(itemCase.id);
@@ -991,7 +1193,7 @@ function sellOwnedCases(caseId, qty) {
   const toSell = Math.min(quantity, owned);
 
   if (toSell <= 0) {
-    setResult("No owned cases to liquidate.", "Sale Failed", "red", makeItemImage("No Case", "red", itemCase.name));
+    showToast("No owned cases to sell.", "Sell Failed", "red", makeItemImage("No Case", "red", itemCase.name));
     return false;
   }
 
@@ -1001,11 +1203,11 @@ function sellOwnedCases(caseId, qty) {
 
   refreshWallet();
   renderCaseInventory();
-  renderActiveCase();
+  renderCases();
   saveState();
   renderCaseDetail();
 
-  setResult(`Liquidated ${toSell}x ${itemCase.name} for ${money(total)}.`, "Cases Sold", "gold", makeItemImage(itemCase.name, "gold", "Sold"));
+  showToast(`Sold ${toSell}x ${itemCase.name} for ${money(total)}.`, "Cases Sold", "gold", makeItemImage(itemCase.name, "gold", "Sold"));
   return true;
 }
 
@@ -1015,7 +1217,7 @@ function buyCase(caseId = state.selectedCaseId, qty = 1) {
   const totalCost = itemCase.price * quantity;
 
   if (state.balance < totalCost) {
-    setResult("Insufficient funds to acquire this case.", "Purchase Failed", "red", makeItemImage("Denied", "red", "VaultSpin"));
+    showToast("Not enough fake funds.", "Purchase Failed", "red", makeItemImage("Denied", "red", "VaultSpin"));
     return false;
   }
 
@@ -1024,37 +1226,85 @@ function buyCase(caseId = state.selectedCaseId, qty = 1) {
   state.ownedCases[itemCase.id] = ownedCaseCount(itemCase.id) + quantity;
   refreshWallet();
   renderCaseInventory();
-  renderActiveCase();
+  renderCases();
   saveState();
 
-  setResult(
-    `Acquired ${quantity}x ${itemCase.name} for ${money(totalCost)}.`,
-    `${itemCase.name} added to collection`,
+  showToast(
+    `Bought ${quantity}x ${itemCase.name} for ${money(totalCost)}.`,
+    `${itemCase.name} added`,
     "gold",
-    makeItemImage(itemCase.name, "gold", "Acquired")
+    makeItemImage(itemCase.name, "gold", "Bought")
   );
   return true;
 }
 
+/* ===== BUY & OPEN (NEW) ===== */
+async function buyAndOpenCase(caseId) {
+  const bought = buyCase(caseId, 1);
+  if (!bought) return;
+  await openCase(caseId, { autoClose: false });
+}
+
+/* ===== CASE OPENING ===== */
 async function openCase(caseId = state.selectedCaseId, options = {}) {
   if (state.opening) return false;
   const autoClose = Boolean(options.autoClose);
 
   const itemCase = getCaseById(caseId);
   if (ownedCaseCount(itemCase.id) <= 0) {
-    setResult("You do not own this case yet. Acquire it first.", "No Case Owned", "red", makeItemImage("No Case", "red", itemCase.name));
+    showToast("You don't own this case. Buy it first.", "No Case Owned", "red", makeItemImage("No Case", "red", itemCase.name));
     return false;
   }
 
   state.opening = true;
   state.ownedCases[itemCase.id] = ownedCaseCount(itemCase.id) - 1;
   renderCaseInventory();
-  renderActiveCase();
+  renderCases();
   saveState();
 
   const winner = rollItem(itemCase);
-  const spin = makeReelSpin(itemCase, winner);
 
+  // Fast open mode: skip animation entirely
+  if (state.fastOpen) {
+    const entry = {
+      ...winner,
+      source: itemCase.name,
+      caseName: itemCase.name,
+      time: new Date().toLocaleTimeString(),
+    };
+
+    state.inventory.unshift(entry);
+    state.history.unshift(entry);
+    state.stats.opened += 1;
+    state.stats.rarityHits[entry.tier] += 1;
+    updateStreak(entry.tier);
+
+    if (entry.value > state.stats.bestDropValue) {
+      state.stats.bestDropValue = entry.value;
+      state.stats.bestDropName = entry.name;
+    }
+
+    updateAll();
+    saveState();
+
+    const profitable = entry.value >= itemCase.price;
+    if (!(state.autoQueue > 0)) {
+      showToast(
+        `${profitable ? "Profit" : "Loss"} | ${itemCase.name}`,
+        `${entry.name} (${money(entry.value)})`,
+        entry.tier, entry.image,
+        { profit: profitable }
+      );
+    }
+
+    if (["pink", "red", "gold"].includes(entry.tier)) fireConfetti(entry.tier);
+
+    state.opening = false;
+    return true;
+  }
+
+  // Animated open
+  const spin = makeReelSpin(itemCase, winner);
   makeReelHTML(spin.slots, els.overlayReelTrack);
   showOverlay(itemCase.name, "single");
 
@@ -1071,6 +1321,7 @@ async function openCase(caseId = state.selectedCaseId, options = {}) {
   state.history.unshift(entry);
   state.stats.opened += 1;
   state.stats.rarityHits[entry.tier] += 1;
+  updateStreak(entry.tier);
 
   if (entry.value > state.stats.bestDropValue) {
     state.stats.bestDropValue = entry.value;
@@ -1081,17 +1332,19 @@ async function openCase(caseId = state.selectedCaseId, options = {}) {
   saveState();
 
   const profitable = entry.value >= itemCase.price;
-  const message = profitable ? "Profitable reveal" : "Value declined";
-  setResult(`${message} | ${itemCase.name}`, `${entry.name} (${money(entry.value)})`, entry.tier, entry.image);
+  const message = profitable ? "Profit hit" : "Loss roll";
 
   els.overlayResultText.textContent = `${message} | ${itemCase.name}`;
   els.overlayResultItem.className = tierClass(entry.tier);
   els.overlayResultItem.textContent = `${entry.name} (${money(entry.value)})`;
   els.overlayResultImage.src = entry.image;
   els.overlayResultImage.alt = entry.name;
+  els.overlayFairBadge.textContent = `Roll: ${entry.rollValue} | Seed: ${entry.seed}`;
+
+  if (["pink", "red", "gold"].includes(entry.tier)) fireConfetti(entry.tier);
 
   if (autoClose || state.autoQueue > 0) {
-    await new Promise((resolve) => window.setTimeout(resolve, 600));
+    await new Promise((resolve) => window.setTimeout(resolve, 500));
     hideOverlay();
   } else {
     await waitForOverlayClose();
@@ -1099,40 +1352,6 @@ async function openCase(caseId = state.selectedCaseId, options = {}) {
 
   state.opening = false;
   return true;
-}
-
-async function runAutoOpen() {
-  if (state.autoQueue > 0 || state.opening) return;
-
-  const selected = getCaseById(state.selectedCaseId);
-  if (ownedCaseCount(selected.id) <= 0) {
-    els.autoStatus.textContent = "No owned cases for selected case. Acquire first.";
-    return;
-  }
-
-  const desired = clamp(Number(els.autoCount.value) || 1, 1, 25);
-  state.autoQueue = desired;
-  state.autoStopped = false;
-
-  while (state.autoQueue > 0 && !state.autoStopped) {
-    if (ownedCaseCount(selected.id) <= 0) break;
-    els.autoStatus.textContent = `Queue active: ${state.autoQueue} remaining`;
-    const opened = await openCase(selected.id, { autoClose: true });
-    if (!opened) break;
-    state.autoQueue -= 1;
-    await new Promise((resolve) => window.setTimeout(resolve, 150));
-  }
-
-  if (state.autoStopped) {
-    els.autoStatus.textContent = "Queue halted.";
-  } else if (state.autoQueue === 0) {
-    els.autoStatus.textContent = "Queue complete.";
-  } else {
-    els.autoStatus.textContent = "Queue ended early (insufficient cases).";
-  }
-
-  state.autoQueue = 0;
-  state.autoStopped = false;
 }
 
 async function openMultipleCases(caseId, count) {
@@ -1143,7 +1362,7 @@ async function openMultipleCases(caseId, count) {
   const maxPossible = Math.min(desired, ownedCaseCount(targetCase.id));
 
   if (maxPossible <= 0) {
-    setResult("No owned cases available to open.", "No Case Owned", "red", makeItemImage("No Case", "red", targetCase.name));
+    showToast("No owned cases to open.", "No Case Owned", "red", makeItemImage("No Case", "red", targetCase.name));
     return;
   }
 
@@ -1155,9 +1374,54 @@ async function openMultipleCases(caseId, count) {
   state.opening = true;
   state.ownedCases[targetCase.id] = ownedCaseCount(targetCase.id) - maxPossible;
   renderCaseInventory();
-  renderActiveCase();
+  renderCases();
   saveState();
 
+  // Fast open for multi
+  if (state.fastOpen) {
+    let bestEntry = null;
+    for (let i = 0; i < maxPossible; i++) {
+      const winner = rollItem(targetCase);
+      const entry = {
+        ...winner,
+        source: targetCase.name,
+        caseName: targetCase.name,
+        time: new Date().toLocaleTimeString(),
+      };
+
+      state.inventory.unshift(entry);
+      state.history.unshift(entry);
+      state.stats.opened += 1;
+      state.stats.rarityHits[entry.tier] += 1;
+      updateStreak(entry.tier);
+
+      if (entry.value > state.stats.bestDropValue) {
+        state.stats.bestDropValue = entry.value;
+        state.stats.bestDropName = entry.name;
+      }
+
+      if (!bestEntry || entry.value > bestEntry.value) bestEntry = entry;
+
+      if (["pink", "red", "gold"].includes(entry.tier)) fireConfetti(entry.tier);
+    }
+
+    updateAll();
+    saveState();
+
+    if (bestEntry) {
+      showToast(
+        `Opened ${maxPossible}x ${targetCase.name}`,
+        `Best: ${bestEntry.name} (${money(bestEntry.value)})`,
+        bestEntry.tier,
+        bestEntry.image
+      );
+    }
+
+    state.opening = false;
+    return;
+  }
+
+  // Animated multi-open
   showOverlay(`${targetCase.name} x${maxPossible}`, "multi");
   els.multiOpenGrid.innerHTML = "";
 
@@ -1168,13 +1432,12 @@ async function openMultipleCases(caseId, count) {
 
     const card = document.createElement("article");
     card.className = "multi-card";
-    card.style.animationDelay = `${i * 60}ms`;
     card.innerHTML = `
       <div class="needle"></div>
       <div class="reel-window"><div class="reel-track"></div></div>
       <div class="multi-result">
         <img class="item-thumb multi-thumb" alt="Rolling item" />
-        <p>Revealing...</p>
+        <p>Rolling...</p>
         <h4>---</h4>
       </div>
     `;
@@ -1206,6 +1469,7 @@ async function openMultipleCases(caseId, count) {
     state.history.unshift(entry);
     state.stats.opened += 1;
     state.stats.rarityHits[entry.tier] += 1;
+    updateStreak(entry.tier);
 
     if (entry.value > state.stats.bestDropValue) {
       state.stats.bestDropValue = entry.value;
@@ -1215,20 +1479,22 @@ async function openMultipleCases(caseId, count) {
     if (!bestEntry || entry.value > bestEntry.value) bestEntry = entry;
 
     const profitable = entry.value >= targetCase.price;
-    item.resultText.textContent = profitable ? "Profitable" : "Below value";
+    item.resultText.textContent = profitable ? "Profit hit" : "Loss roll";
     item.resultTitle.className = tierClass(entry.tier);
     item.resultTitle.textContent = `${entry.name} (${money(entry.value)})`;
     item.resultImage.src = entry.image;
     item.resultImage.alt = entry.name;
+
+    if (["pink", "red", "gold"].includes(entry.tier)) fireConfetti(entry.tier);
   });
 
   updateAll();
   saveState();
 
   if (bestEntry) {
-    setResult(
-      `Unveiled ${maxPossible}x ${targetCase.name} simultaneously.`,
-      `${bestEntry.name} (${money(bestEntry.value)})`,
+    showToast(
+      `Opened ${maxPossible}x ${targetCase.name}`,
+      `Best: ${bestEntry.name} (${money(bestEntry.value)})`,
       bestEntry.tier,
       bestEntry.image
     );
@@ -1239,8 +1505,75 @@ async function openMultipleCases(caseId, count) {
   state.opening = false;
 }
 
+/* ===== AUTO OPEN ===== */
+async function runAutoOpen() {
+  if (state.autoQueue > 0 || state.opening) return;
+
+  const selected = getCaseById(state.selectedCaseId);
+  if (ownedCaseCount(selected.id) <= 0) {
+    els.autoStatus.textContent = "No owned cases for selected case. Buy first.";
+    return;
+  }
+
+  const desired = clamp(Number(els.autoCount.value) || 1, 1, 25);
+  state.autoQueue = desired;
+  state.autoStopped = false;
+
+  els.autoBarStatus.textContent = `Auto-opening ${selected.name}...`;
+  els.autoBarStop.classList.remove("hidden");
+
+  while (state.autoQueue > 0 && !state.autoStopped) {
+    if (ownedCaseCount(selected.id) <= 0) break;
+    els.autoStatus.textContent = `Queue running: ${state.autoQueue} remaining`;
+    els.autoBarStatus.textContent = `Queue: ${state.autoQueue} remaining | ${selected.name}`;
+    const opened = await openCase(selected.id, { autoClose: true });
+    if (!opened) break;
+    state.autoQueue -= 1;
+    if (!state.fastOpen) {
+      await new Promise((resolve) => window.setTimeout(resolve, 130));
+    }
+  }
+
+  // Summary toast for auto-open
+  if (desired > 1) {
+    const opened = desired - state.autoQueue;
+    showToast(
+      `Auto-opened ${opened}x ${selected.name}`,
+      "Queue Complete",
+      "gold",
+      makeItemImage(selected.name, "gold", "Auto")
+    );
+  }
+
+  if (state.autoStopped) {
+    els.autoStatus.textContent = "Queue stopped.";
+    els.autoBarStatus.textContent = "Queue stopped.";
+  } else if (state.autoQueue === 0) {
+    els.autoStatus.textContent = "Queue complete.";
+    els.autoBarStatus.textContent = "Queue complete.";
+  } else {
+    els.autoStatus.textContent = "Queue ended early (no cases left).";
+    els.autoBarStatus.textContent = "Queue ended early.";
+  }
+
+  els.autoBarStop.classList.add("hidden");
+  state.autoQueue = 0;
+  state.autoStopped = false;
+}
+
+/* ===== GLOBAL UPDATES ===== */
+function updateAll() {
+  refreshWallet();
+  renderCaseInventory();
+  renderInventory();
+  renderHistory();
+  renderStats();
+  renderView();
+  renderCaseDetail();
+}
+
 function resetEverything() {
-  const ok = window.confirm("Reset all progress? This clears balance, cases, items, history, and statistics.");
+  const ok = window.confirm("Reset everything? This clears balance, owned cases, opened items, history, and all stats.");
   if (!ok) return;
 
   const selectedCaseId = state.selectedCaseId;
@@ -1249,25 +1582,57 @@ function resetEverything() {
 
   localStorage.removeItem(STORAGE_KEY);
 
+  renderCases();
   updateAll();
   saveState();
-  setResult("All progress reset.", "Fresh Start", "gold", makeItemImage("Fresh Start", "gold", "VaultSpin"));
-  els.autoStatus.textContent = "No active queue.";
+  showToast("All progress reset.", "Fresh Start", "gold", makeItemImage("Fresh Start", "gold", "VaultSpin"));
+  els.autoStatus.textContent = "No queue active.";
+  els.autoBarStatus.textContent = "Select a case to begin.";
 }
 
+/* ===== EVENT WIRING ===== */
 function wireEvents() {
-  els.viewTabs.addEventListener("click", (event) => {
-    const button = event.target.closest(".tab-btn");
-    if (!button) return;
-    state.currentView = button.dataset.view;
-    renderView();
+  // Navigation: sidebar + bottom nav
+  document.querySelectorAll("[data-section]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.currentView = btn.dataset.section;
+      renderView();
+      saveState();
+    });
+  });
+
+  // Deposit
+  els.depositBtn.addEventListener("click", () => {
+    const amount = Number(els.depositInput.value);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      showToast("Enter a valid amount.", "Deposit Failed", "red", makeItemImage("Invalid", "red", "VaultSpin"));
+      return;
+    }
+
+    state.balance += amount;
+    state.stats.deposited += amount;
+    els.depositInput.value = "";
+    refreshWallet();
+    saveState();
+    showToast(`Deposited ${money(amount)} fake cash.`, "Balance Updated", "gold", makeItemImage("Funded", "gold", "VaultSpin"));
+  });
+
+  els.depositInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") els.depositBtn.click();
+  });
+
+  // Fast mode toggle
+  els.fastModeToggle.addEventListener("change", () => {
+    state.fastOpen = els.fastModeToggle.checked;
     saveState();
   });
 
+  // Case dialog actions
   els.caseBuyBtn.addEventListener("click", () => {
     if (!state.detailCaseId) return;
     const qty = clamp(Number(els.caseQtyInput.value) || 1, 1, 10);
     buyCase(state.detailCaseId, qty);
+    renderCaseDetail();
   });
 
   els.caseOpenBtn.addEventListener("click", async () => {
@@ -1308,30 +1673,30 @@ function wireEvents() {
     }
   });
 
-  els.depositBtn.addEventListener("click", () => {
-    const amount = Number(els.depositInput.value);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      setResult("Enter a valid amount.", "Deposit Failed", "red", makeItemImage("Invalid", "red", "VaultSpin"));
-      return;
-    }
-
-    state.balance += amount;
-    els.depositInput.value = "";
-    refreshWallet();
-    saveState();
-    setResult(`Deposited ${money(amount)} into your account.`, "Balance Updated", "gold", makeItemImage("Funded", "gold", "VaultSpin"));
+  els.closeCaseDialog.addEventListener("click", () => {
+    els.caseDialog.close();
+    state.detailCaseId = null;
   });
 
-  els.depositInput.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") els.depositBtn.click();
+  // Auto open (from dialog)
+  els.autoBtn.addEventListener("click", () => {
+    if (!state.detailCaseId) return;
+    state.selectedCaseId = state.detailCaseId;
+    els.caseDialog.close();
+    state.detailCaseId = null;
+    runAutoOpen();
   });
-
-  els.autoBtn.addEventListener("click", () => runAutoOpen());
 
   els.stopAutoBtn.addEventListener("click", () => {
     state.autoStopped = true;
   });
 
+  // Auto bar stop (from case room)
+  els.autoBarStop.addEventListener("click", () => {
+    state.autoStopped = true;
+  });
+
+  // Opening overlay
   els.skipSpinBtn.addEventListener("click", () => {
     if (state.spinSkippers.length > 0) {
       [...state.spinSkippers].forEach((skipFn) => {
@@ -1349,20 +1714,22 @@ function wireEvents() {
     }
   });
 
+  // Inventory actions
   els.sellBlueBtn.addEventListener("click", () => sellByTier("blue"));
   els.sellAllBtn.addEventListener("click", () => sellByTier(null));
 
-  els.resetBtn.addEventListener("click", () => resetEverything());
+  // Inventory sort/filter
+  els.invSearchInput.addEventListener("input", () => renderInventory());
+  els.invSortSelect.addEventListener("change", () => renderInventory());
 
-  els.closeCaseDialog.addEventListener("click", () => {
-    els.caseDialog.close();
-    state.detailCaseId = null;
-  });
+  // Reset
+  els.resetBtn.addEventListener("click", () => resetEverything());
 }
 
+/* ===== INIT ===== */
 loadState();
 wireEvents();
 renderChips();
 renderCases();
 updateAll();
-setResult("System ready.", "Acquire a case, then unveil it in inventory", "blue", makeItemImage("Ready", "blue", "VaultSpin"));
+showToast("System ready. Buy a case, then open it!", "Welcome", "blue", makeItemImage("Ready", "blue", "VaultSpin"));
