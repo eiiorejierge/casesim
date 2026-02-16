@@ -35,7 +35,19 @@
       </div>
     </header>
 
-    <section class="panel controls-panel">
+    <section class="panel tabs-panel">
+      <div class="view-tabs" id="viewTabs">
+        <button class="tab-btn active" data-view="market">Case Room</button>
+        <button class="tab-btn" data-view="inventory">Inventory</button>
+        <button class="tab-btn" data-view="history">History</button>
+      </div>
+      <div class="title-row">
+        <p class="muted">Open cases in Case Room. Manage your items in Inventory.</p>
+        <button class="btn btn-danger" id="resetBtn">Reset Everything</button>
+      </div>
+    </section>
+
+    <section class="panel controls-panel" data-view-target="market">
       <div class="deposit-wrap">
         <h2>Deposit Fake Cash</h2>
         <div class="deposit-controls">
@@ -55,28 +67,25 @@
       </div>
     </section>
 
-    <section class="panel cases-panel">
+    <section class="panel cases-panel" data-view-target="market">
       <div class="title-row">
         <h2>Case Market</h2>
-        <p class="muted">CS-like rarity odds: Blue 79.92% | Purple 15.98% | Pink 3.2% | Red 0.64% | Gold 0.26%</p>
+        <p class="muted">Blue 79.92% | Purple 15.98% | Pink 3.2% | Red 0.64% | Gold 0.26%</p>
       </div>
       <div class="case-grid" id="caseGrid"></div>
     </section>
 
-    <section class="panel spinner-panel">
+    <section class="panel last-drop-panel" data-view-target="market">
       <div class="title-row">
-        <h2>Opening Chamber</h2>
+        <h2>Last Opening</h2>
         <p class="muted" id="activeCaseLabel">Pick a case to begin.</p>
       </div>
-      <div class="chamber">
-        <div class="needle"></div>
-        <div class="reel-window">
-          <div class="reel-track" id="reelTrack"></div>
+      <div class="last-drop-card">
+        <img id="resultImage" class="item-thumb" alt="Drop image" />
+        <div>
+          <p id="resultText">Your next drop appears here.</p>
+          <h3 id="resultItem">---</h3>
         </div>
-      </div>
-      <div class="result-wrap">
-        <p id="resultText">Your next drop appears here.</p>
-        <h3 id="resultItem">---</h3>
       </div>
     </section>
 
@@ -88,7 +97,7 @@
       <div class="rarity-bars" id="rarityBars"></div>
     </section>
 
-    <section class="panel inventory-panel">
+    <section class="panel inventory-panel" data-view-target="inventory">
       <div class="title-row">
         <h2>Inventory</h2>
         <div class="inventory-actions">
@@ -99,7 +108,7 @@
       <div class="inventory-list" id="inventoryList"></div>
     </section>
 
-    <section class="panel history-panel">
+    <section class="panel history-panel" data-view-target="history">
       <div class="title-row">
         <h2>Drop History</h2>
         <p class="muted">Latest openings first.</p>
@@ -107,6 +116,26 @@
       <div class="history-list" id="historyList"></div>
     </section>
   </main>
+
+  <section class="opening-overlay hidden" id="openingOverlay">
+    <div class="opening-frame">
+      <div class="opening-head">
+        <p class="muted" id="overlayCaseName">Opening...</p>
+        <button class="btn btn-danger" id="skipSpinBtn">Skip</button>
+      </div>
+      <div class="opening-chamber">
+        <div class="needle"></div>
+        <div class="reel-window fullscreen-reel-window">
+          <div class="reel-track" id="overlayReelTrack"></div>
+        </div>
+      </div>
+      <div class="overlay-result">
+        <img id="overlayResultImage" class="item-thumb overlay-thumb" alt="Result image" />
+        <p id="overlayResultText">Rolling...</p>
+        <h2 id="overlayResultItem">---</h2>
+      </div>
+    </div>
+  </section>
 
   <template id="caseTemplate">
     <article class="case-card">
@@ -124,6 +153,7 @@
 
   <template id="inventoryTemplate">
     <article class="inventory-item">
+      <img class="item-thumb inventory-thumb" alt="Inventory item" />
       <div>
         <p class="inventory-name"></p>
         <p class="inventory-meta"></p>
@@ -134,8 +164,11 @@
 
   <template id="historyTemplate">
     <article class="history-item">
-      <p class="history-title"></p>
-      <p class="history-meta"></p>
+      <img class="item-thumb history-thumb" alt="History item" />
+      <div>
+        <p class="history-title"></p>
+        <p class="history-meta"></p>
+      </div>
     </article>
   </template>
 
