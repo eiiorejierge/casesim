@@ -302,6 +302,17 @@ input {
   padding: 0.7rem;
 }
 
+.case-open-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.multi-open-input {
+  width: 60px;
+  text-align: center;
+}
+
 .case-inv-name {
   margin: 0;
   font-weight: 800;
@@ -400,6 +411,21 @@ input {
   gap: 0.6rem;
   align-items: center;
   margin-bottom: 0.8rem;
+}
+
+.overlay-buttons {
+  display: flex;
+  gap: 0.45rem;
+}
+
+.hidden-action {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.hidden-action.show {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .opening-chamber {

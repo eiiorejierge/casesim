@@ -406,6 +406,7 @@ const els = {
   openingOverlay: document.getElementById("openingOverlay"),
   overlayCaseName: document.getElementById("overlayCaseName"),
   skipSpinBtn: document.getElementById("skipSpinBtn"),
+  closeOverlayBtn: document.getElementById("closeOverlayBtn"),
   overlayReelTrack: document.getElementById("overlayReelTrack"),
   overlayResultText: document.getElementById("overlayResultText"),
   overlayResultItem: document.getElementById("overlayResultItem"),
@@ -442,6 +443,7 @@ function freshState() {
     autoQueue: 0,
     autoStopped: false,
     spinSkipper: null,
+    overlayCloseResolver: null,
   };
 }
 
@@ -662,6 +664,7 @@ function showOverlay(caseName) {
   els.overlayResultItem.textContent = "---";
   els.overlayResultItem.className = "";
   els.overlayResultImage.src = makeItemImage("Rolling", "blue", caseName);
+  els.closeOverlayBtn.classList.remove("show");
   els.openingOverlay.classList.remove("hidden");
   document.body.classList.add("overlay-open");
 }
@@ -669,6 +672,13 @@ function showOverlay(caseName) {
 function hideOverlay() {
   els.openingOverlay.classList.add("hidden");
   document.body.classList.remove("overlay-open");
+}
+
+function waitForOverlayClose() {
+  return new Promise((resolve) => {
+    state.overlayCloseResolver = resolve;
+    els.closeOverlayBtn.classList.add("show");
+  });
 }
 
 function renderCases() {
@@ -731,13 +741,17 @@ function renderCaseInventory() {
 
   owned.forEach(({ itemCase, count }) => {
     const row = els.caseInventoryTemplate.content.firstElementChild.cloneNode(true);
+    const multiInput = row.querySelector(".multi-open-input");
+    const openButton = row.querySelector(".open-owned-btn");
     row.querySelector(".case-inv-name").textContent = itemCase.name;
     row.querySelector(".case-inv-meta").textContent = `Owned: ${count} | Buy Price: ${money(itemCase.price)}`;
-    row.querySelector(".open-owned-btn").addEventListener("click", () => {
+    multiInput.max = String(Math.min(5, count));
+    openButton.addEventListener("click", () => {
+      const desired = clamp(Number(multiInput.value) || 1, 1, 5);
       state.selectedCaseId = itemCase.id;
       renderCases();
       renderActiveCase();
-      openCase(itemCase.id);
+      openMultipleCases(itemCase.id, desired);
     });
     els.caseInventoryList.appendChild(row);
   });
@@ -845,7 +859,6 @@ function setResult(message, itemName, tier, image) {
 
 function updateAll() {
   refreshWallet();
-  renderCases();
   renderActiveCase();
   renderCaseInventory();
   renderInventory();
@@ -956,8 +969,9 @@ function buyCase(caseId = state.selectedCaseId, qty = 1) {
   return true;
 }
 
-async function openCase(caseId = state.selectedCaseId) {
+async function openCase(caseId = state.selectedCaseId, options = {}) {
   if (state.opening) return false;
+  const autoClose = Boolean(options.autoClose);
 
   const itemCase = getCaseById(caseId);
   if (ownedCaseCount(itemCase.id) <= 0) {
@@ -1009,9 +1023,13 @@ async function openCase(caseId = state.selectedCaseId) {
   els.overlayResultImage.src = entry.image;
   els.overlayResultImage.alt = entry.name;
 
-  await new Promise((resolve) => window.setTimeout(resolve, state.autoQueue > 0 ? 300 : 850));
+  if (autoClose || state.autoQueue > 0) {
+    await new Promise((resolve) => window.setTimeout(resolve, 500));
+    hideOverlay();
+  } else {
+    await waitForOverlayClose();
+  }
 
-  hideOverlay();
   state.opening = false;
   return true;
 }
@@ -1032,7 +1050,7 @@ async function runAutoOpen() {
   while (state.autoQueue > 0 && !state.autoStopped) {
     if (ownedCaseCount(selected.id) <= 0) break;
     els.autoStatus.textContent = `Queue running: ${state.autoQueue} remaining`;
-    const opened = await openCase(selected.id);
+    const opened = await openCase(selected.id, { autoClose: true });
     if (!opened) break;
     state.autoQueue -= 1;
     await new Promise((resolve) => window.setTimeout(resolve, 130));
@@ -1048,6 +1066,25 @@ async function runAutoOpen() {
 
   state.autoQueue = 0;
   state.autoStopped = false;
+}
+
+async function openMultipleCases(caseId, count) {
+  if (state.opening) return;
+
+  const targetCase = getCaseById(caseId);
+  const desired = clamp(Number(count) || 1, 1, 5);
+  const maxPossible = Math.min(desired, ownedCaseCount(targetCase.id));
+
+  if (maxPossible <= 0) {
+    setResult("No owned cases available to open.", "No Case Owned", "red", makeItemImage("No Case", "red", targetCase.name));
+    return;
+  }
+
+  const autoClose = maxPossible > 1;
+  for (let i = 0; i < maxPossible; i += 1) {
+    const opened = await openCase(targetCase.id, { autoClose });
+    if (!opened) break;
+  }
 }
 
 function resetEverything() {
@@ -1103,6 +1140,15 @@ function wireEvents() {
     if (typeof state.spinSkipper === "function") state.spinSkipper();
   });
 
+  els.closeOverlayBtn.addEventListener("click", () => {
+    hideOverlay();
+    if (typeof state.overlayCloseResolver === "function") {
+      const resolve = state.overlayCloseResolver;
+      state.overlayCloseResolver = null;
+      resolve();
+    }
+  });
+
   els.sellBlueBtn.addEventListener("click", () => sellByTier("blue"));
   els.sellAllBtn.addEventListener("click", () => sellByTier(null));
 
@@ -1114,5 +1160,6 @@ function wireEvents() {
 loadState();
 wireEvents();
 renderChips();
+renderCases();
 updateAll();
 setResult("System ready.", "Buy a case, then open it in Inventory", "blue", makeItemImage("Ready", "blue", "VaultSpin"));

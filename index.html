@@ -124,7 +124,10 @@
     <div class="opening-frame">
       <div class="opening-head">
         <p class="muted" id="overlayCaseName">Opening...</p>
-        <button class="btn btn-danger" id="skipSpinBtn">Skip</button>
+        <div class="overlay-buttons">
+          <button class="btn btn-danger" id="skipSpinBtn">Skip</button>
+          <button class="btn hidden-action" id="closeOverlayBtn">Close</button>
+        </div>
       </div>
       <div class="opening-chamber">
         <div class="needle"></div>
@@ -171,7 +174,10 @@
         <p class="case-inv-name"></p>
         <p class="case-inv-meta"></p>
       </div>
-      <button class="btn btn-open open-owned-btn">Open</button>
+      <div class="case-open-controls">
+        <input class="multi-open-input" type="number" min="1" max="5" step="1" value="1" />
+        <button class="btn btn-open open-owned-btn">Open</button>
+      </div>
     </article>
   </template>
 
