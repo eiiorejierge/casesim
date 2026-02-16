@@ -942,11 +942,9 @@ function buyCase(caseId = state.selectedCaseId, qty = 1) {
   state.balance -= totalCost;
   state.stats.spent += totalCost;
   state.ownedCases[itemCase.id] = ownedCaseCount(itemCase.id) + quantity;
-  state.currentView = "inventory";
   refreshWallet();
   renderCaseInventory();
   renderActiveCase();
-  renderView();
   saveState();
 
   setResult(
