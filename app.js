@@ -774,9 +774,9 @@ function renderCaseInventory() {
     const openButton = row.querySelector(".open-owned-btn");
     row.querySelector(".case-inv-name").textContent = itemCase.name;
     row.querySelector(".case-inv-meta").textContent = `Owned: ${count} | Buy Price: ${money(itemCase.price)}`;
-    multiInput.max = String(Math.min(5, count));
+    multiInput.max = String(Math.min(10, count));
     openButton.addEventListener("click", () => {
-      const desired = clamp(Number(multiInput.value) || 1, 1, 5);
+      const desired = clamp(Number(multiInput.value) || 1, 1, 10);
       state.selectedCaseId = itemCase.id;
       renderCases();
       renderActiveCase();
@@ -941,7 +941,7 @@ function renderCaseDetail() {
   if (!state.detailCaseId) return;
   const itemCase = getCaseById(state.detailCaseId);
   const owned = ownedCaseCount(itemCase.id);
-  const qty = clamp(Number(els.caseQtyInput.value) || 1, 1, 5);
+  const qty = clamp(Number(els.caseQtyInput.value) || 1, 1, 10);
   els.caseQtyInput.value = String(qty);
 
   els.caseDialogTitle.textContent = itemCase.name;
@@ -987,7 +987,7 @@ function openCaseDetail(caseId) {
 function sellOwnedCases(caseId, qty) {
   const itemCase = getCaseById(caseId);
   const owned = ownedCaseCount(itemCase.id);
-  const quantity = clamp(Math.floor(Number(qty) || 1), 1, 5);
+  const quantity = clamp(Math.floor(Number(qty) || 1), 1, 10);
   const toSell = Math.min(quantity, owned);
 
   if (toSell <= 0) {
@@ -1003,7 +1003,6 @@ function sellOwnedCases(caseId, qty) {
   renderCaseInventory();
   renderActiveCase();
   saveState();
-  renderCaseDetail();
   renderCaseDetail();
 
   setResult(`Sold ${toSell}x ${itemCase.name} for ${money(total)}.`, "Cases Sold", "gold", makeItemImage(itemCase.name, "gold", "Sold"));
@@ -1140,7 +1139,7 @@ async function openMultipleCases(caseId, count) {
   if (state.opening) return;
 
   const targetCase = getCaseById(caseId);
-  const desired = clamp(Number(count) || 1, 1, 5);
+  const desired = clamp(Number(count) || 1, 1, 10);
   const maxPossible = Math.min(desired, ownedCaseCount(targetCase.id));
 
   if (maxPossible <= 0) {
@@ -1266,15 +1265,15 @@ function wireEvents() {
 
   els.caseBuyBtn.addEventListener("click", () => {
     if (!state.detailCaseId) return;
-    const qty = clamp(Number(els.caseQtyInput.value) || 1, 1, 5);
+    const qty = clamp(Number(els.caseQtyInput.value) || 1, 1, 10);
     buyCase(state.detailCaseId, qty);
   });
 
   els.caseOpenBtn.addEventListener("click", async () => {
     if (!state.detailCaseId) return;
     const caseId = state.detailCaseId;
-    const qty = clamp(Number(els.caseQtyInput.value) || 1, 1, 5);
-    if (qty >= 5) {
+    const qty = clamp(Number(els.caseQtyInput.value) || 1, 1, 10);
+    if (qty >= 10) {
       els.caseDialog.close();
       state.detailCaseId = null;
     }
@@ -1287,12 +1286,12 @@ function wireEvents() {
     const caseId = state.detailCaseId;
     els.caseDialog.close();
     state.detailCaseId = null;
-    await openMultipleCases(caseId, 5);
+    await openMultipleCases(caseId, 10);
   });
 
   els.caseSellBtn.addEventListener("click", () => {
     if (!state.detailCaseId) return;
-    const qty = clamp(Number(els.caseQtyInput.value) || 1, 1, 5);
+    const qty = clamp(Number(els.caseQtyInput.value) || 1, 1, 10);
     sellOwnedCases(state.detailCaseId, qty);
   });
 
@@ -1302,7 +1301,7 @@ function wireEvents() {
     if (owned <= 0) return;
     let remaining = owned;
     while (remaining > 0) {
-      const chunk = Math.min(5, remaining);
+      const chunk = Math.min(10, remaining);
       sellOwnedCases(state.detailCaseId, chunk);
       remaining -= chunk;
     }
@@ -1366,6 +1365,7 @@ renderChips();
 renderCases();
 updateAll();
 setResult("System ready.", "Buy a case, then open it in Inventory", "blue", makeItemImage("Ready", "blue", "VaultSpin"));
+
 
 
 
