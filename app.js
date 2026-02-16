@@ -407,6 +407,9 @@ const els = {
   overlayCaseName: document.getElementById("overlayCaseName"),
   skipSpinBtn: document.getElementById("skipSpinBtn"),
   closeOverlayBtn: document.getElementById("closeOverlayBtn"),
+  singleOpenView: document.getElementById("singleOpenView"),
+  multiOpenView: document.getElementById("multiOpenView"),
+  multiOpenGrid: document.getElementById("multiOpenGrid"),
   overlayReelTrack: document.getElementById("overlayReelTrack"),
   overlayResultText: document.getElementById("overlayResultText"),
   overlayResultItem: document.getElementById("overlayResultItem"),
@@ -442,7 +445,7 @@ function freshState() {
     opening: false,
     autoQueue: 0,
     autoStopped: false,
-    spinSkipper: null,
+    spinSkippers: [],
     overlayCloseResolver: null,
   };
 }
@@ -621,55 +624,68 @@ function makeReelHTML(slots, reelTrackEl) {
   });
 }
 
-function runSpinAnimation(targetIndex) {
+function setOverlayMode(mode) {
+  const multi = mode === "multi";
+  els.singleOpenView.classList.toggle("hidden-view", multi);
+  els.multiOpenView.classList.toggle("hidden-view", !multi);
+}
+
+function runSpinAnimation(reelTrackEl, targetIndex) {
   return new Promise((resolve) => {
-    const reelWindow = els.overlayReelTrack.parentElement;
-    const firstSlot = els.overlayReelTrack.firstElementChild;
+    const reelWindow = reelTrackEl.parentElement;
+    const firstSlot = reelTrackEl.firstElementChild;
     const slotWidth = firstSlot ? firstSlot.getBoundingClientRect().width : 170;
     const stopAt = targetIndex * slotWidth - (reelWindow.clientWidth / 2 - slotWidth / 2);
     let finished = false;
+    let skipper = null;
 
     const finish = () => {
       if (finished) return;
       finished = true;
-      els.overlayReelTrack.removeEventListener("transitionend", onEnd);
-      state.spinSkipper = null;
+      reelTrackEl.removeEventListener("transitionend", onEnd);
+      if (skipper) {
+        state.spinSkippers = state.spinSkippers.filter((fn) => fn !== skipper);
+      }
       resolve();
     };
 
     const onEnd = () => finish();
 
-    state.spinSkipper = () => {
-      els.overlayReelTrack.style.transition = "none";
-      els.overlayReelTrack.style.transform = `translateX(-${stopAt}px)`;
+    skipper = () => {
+      reelTrackEl.style.transition = "none";
+      reelTrackEl.style.transform = `translateX(-${stopAt}px)`;
       finish();
     };
+    state.spinSkippers.push(skipper);
 
-    els.overlayReelTrack.addEventListener("transitionend", onEnd);
-    els.overlayReelTrack.style.transition = "none";
-    els.overlayReelTrack.style.transform = "translateX(0px)";
+    reelTrackEl.addEventListener("transitionend", onEnd);
+    reelTrackEl.style.transition = "none";
+    reelTrackEl.style.transform = "translateX(0px)";
 
     requestAnimationFrame(() => {
-      els.overlayReelTrack.style.transition = "transform 2.45s cubic-bezier(0.1, 0.72, 0.12, 1)";
-      els.overlayReelTrack.style.transform = `translateX(-${stopAt}px)`;
+      reelTrackEl.style.transition = "transform 2.45s cubic-bezier(0.1, 0.72, 0.12, 1)";
+      reelTrackEl.style.transform = `translateX(-${stopAt}px)`;
     });
 
     window.setTimeout(finish, 2600);
   });
 }
 
-function showOverlay(caseName) {
+function showOverlay(caseName, mode = "single") {
+  setOverlayMode(mode);
   els.overlayCaseName.textContent = `Opening ${caseName}`;
   els.overlayResultText.textContent = "Rolling...";
   els.overlayResultItem.textContent = "---";
   els.overlayResultItem.className = "";
   els.overlayResultImage.src = makeItemImage("Rolling", "blue", caseName);
   els.closeOverlayBtn.classList.remove("show");
+  state.spinSkippers = [];
   els.openingOverlay.classList.remove("hidden");
   document.body.classList.add("overlay-open");
 }
 
 function hideOverlay() {
+  state.spinSkippers = [];
   els.openingOverlay.classList.add("hidden");
   document.body.classList.remove("overlay-open");
 }
@@ -989,9 +1005,9 @@ async function openCase(caseId = state.selectedCaseId, options = {}) {
   const spin = makeReelSpin(itemCase, winner);
 
   makeReelHTML(spin.slots, els.overlayReelTrack);
-  showOverlay(itemCase.name);
+  showOverlay(itemCase.name, "single");
 
-  await runSpinAnimation(spin.targetIndex);
+  await runSpinAnimation(els.overlayReelTrack, spin.targetIndex);
 
   const entry = {
     ...winner,
@@ -1080,11 +1096,95 @@ async function openMultipleCases(caseId, count) {
     return;
   }
 
-  const autoClose = maxPossible > 1;
-  for (let i = 0; i < maxPossible; i += 1) {
-    const opened = await openCase(targetCase.id, { autoClose });
-    if (!opened) break;
+  if (maxPossible === 1) {
+    await openCase(targetCase.id, { autoClose: false });
+    return;
   }
+
+  state.opening = true;
+  state.ownedCases[targetCase.id] = ownedCaseCount(targetCase.id) - maxPossible;
+  renderCaseInventory();
+  renderActiveCase();
+  saveState();
+
+  showOverlay(`${targetCase.name} x${maxPossible}`, "multi");
+  els.multiOpenGrid.innerHTML = "";
+
+  const batch = [];
+  for (let i = 0; i < maxPossible; i += 1) {
+    const winner = rollItem(targetCase);
+    const spin = makeReelSpin(targetCase, winner);
+
+    const card = document.createElement("article");
+    card.className = "multi-card";
+    card.innerHTML = `
+      <div class="needle"></div>
+      <div class="reel-window"><div class="reel-track"></div></div>
+      <div class="multi-result">
+        <img class="item-thumb multi-thumb" alt="Rolling item" />
+        <p>Rolling...</p>
+        <h4>---</h4>
+      </div>
+    `;
+
+    const reelTrack = card.querySelector(".reel-track");
+    const resultImage = card.querySelector(".multi-thumb");
+    const resultText = card.querySelector("p");
+    const resultTitle = card.querySelector("h4");
+
+    makeReelHTML(spin.slots, reelTrack);
+    resultImage.src = makeItemImage("Rolling", "blue", targetCase.name);
+
+    els.multiOpenGrid.appendChild(card);
+    batch.push({ winner, spin, resultImage, resultText, resultTitle, reelTrack });
+  }
+
+  await Promise.all(batch.map((item) => runSpinAnimation(item.reelTrack, item.spin.targetIndex)));
+
+  let bestEntry = null;
+  batch.forEach((item) => {
+    const entry = {
+      ...item.winner,
+      source: targetCase.name,
+      caseName: targetCase.name,
+      time: new Date().toLocaleTimeString(),
+    };
+
+    state.inventory.unshift(entry);
+    state.history.unshift(entry);
+    state.stats.opened += 1;
+    state.stats.rarityHits[entry.tier] += 1;
+
+    if (entry.value > state.stats.bestDropValue) {
+      state.stats.bestDropValue = entry.value;
+      state.stats.bestDropName = entry.name;
+    }
+
+    if (!bestEntry || entry.value > bestEntry.value) bestEntry = entry;
+
+    const profitable = entry.value >= targetCase.price;
+    item.resultText.textContent = profitable ? "Profit hit" : "Loss roll";
+    item.resultTitle.className = tierClass(entry.tier);
+    item.resultTitle.textContent = `${entry.name} (${money(entry.value)})`;
+    item.resultImage.src = entry.image;
+    item.resultImage.alt = entry.name;
+  });
+
+  updateAll();
+  saveState();
+
+  if (bestEntry) {
+    setResult(
+      `Opened ${maxPossible}x ${targetCase.name} at once.`,
+      `${bestEntry.name} (${money(bestEntry.value)})`,
+      bestEntry.tier,
+      bestEntry.image
+    );
+  }
+
+  await waitForOverlayClose();
+  hideOverlay();
+  state.opening = false;
 }
 
 function resetEverything() {
@@ -1137,7 +1237,11 @@ function wireEvents() {
   });
 
   els.skipSpinBtn.addEventListener("click", () => {
-    if (typeof state.spinSkipper === "function") state.spinSkipper();
+    if (state.spinSkippers.length > 0) {
+      [...state.spinSkippers].forEach((skipFn) => {
+        if (typeof skipFn === "function") skipFn();
+      });
+    }
   });
 
   els.closeOverlayBtn.addEventListener("click", () => {

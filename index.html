@@ -129,16 +129,22 @@
           <button class="btn hidden-action" id="closeOverlayBtn">Close</button>
         </div>
       </div>
-      <div class="opening-chamber">
-        <div class="needle"></div>
-        <div class="reel-window fullscreen-reel-window">
-          <div class="reel-track" id="overlayReelTrack"></div>
+      <div id="singleOpenView">
+        <div class="opening-chamber">
+          <div class="needle"></div>
+          <div class="reel-window fullscreen-reel-window">
+            <div class="reel-track" id="overlayReelTrack"></div>
+          </div>
+        </div>
+        <div class="overlay-result">
+          <img id="overlayResultImage" class="item-thumb overlay-thumb" alt="Result image" />
+          <p id="overlayResultText">Rolling...</p>
+          <h2 id="overlayResultItem">---</h2>
         </div>
       </div>
-      <div class="overlay-result">
-        <img id="overlayResultImage" class="item-thumb overlay-thumb" alt="Result image" />
-        <p id="overlayResultText">Rolling...</p>
-        <h2 id="overlayResultItem">---</h2>
+
+      <div id="multiOpenView" class="hidden-view">
+        <div class="multi-open-grid" id="multiOpenGrid"></div>
       </div>
     </div>
   </section>

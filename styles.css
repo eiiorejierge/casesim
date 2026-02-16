@@ -492,6 +492,52 @@ input {
   text-align: center;
 }
 
+.multi-open-grid {
+  margin-top: 0.35rem;
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.multi-card {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  background: rgba(10, 16, 26, 0.86);
+  padding: 0.6rem;
+}
+
+.multi-card .reel-window {
+  height: 125px;
+}
+
+.multi-card .reel-slot {
+  min-width: 120px;
+  padding: 0.45rem 0.35rem;
+}
+
+.multi-card .reel-slot img {
+  width: 54px;
+  height: 54px;
+}
+
+.multi-result {
+  margin-top: 0.45rem;
+  display: grid;
+  justify-items: center;
+  text-align: center;
+}
+
+.multi-result p,
+.multi-result h4 {
+  margin: 0;
+}
+
+.multi-thumb {
+  width: 62px;
+  height: 62px;
+  margin-bottom: 0.22rem;
+}
+
 .overlay-thumb {
   width: 96px;
   height: 96px;
